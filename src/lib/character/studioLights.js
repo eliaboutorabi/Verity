@@ -42,6 +42,31 @@ export function createVerityStudioLights({
   return rig;
 }
 
+/**
+ * A floor that catches her shadow and is otherwise invisible.
+ *
+ * A CSS blob under the canvas cannot move with her: she floats, breathes and
+ * turns, and a shadow that ignores all of that reads as a sticker. This is a
+ * real plane with a `ShadowMaterial`, so the shadow is cast by the same light
+ * that lights her and moves with everything she does.
+ *
+ * Nothing else about it renders — the plane itself is fully transparent, so it
+ * composites over whatever the page background happens to be.
+ */
+export function createVerityShadowFloor({ y = -3.05, size = 26, opacity = 0.24 } = {}) {
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size),
+    new THREE.ShadowMaterial({ opacity, transparent: true }),
+  );
+  floor.name = "VerityShadowFloor";
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = y;
+  floor.receiveShadow = true;
+  // Never occludes her, whatever the camera does.
+  floor.renderOrder = -1;
+  return floor;
+}
+
 export function frameVerityCamera(camera, aspect = 1) {
   camera.aspect = aspect;
   camera.position.set(0, 0.65, aspect < 1 ? 14.5 : 13.5);

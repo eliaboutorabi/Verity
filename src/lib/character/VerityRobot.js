@@ -298,6 +298,12 @@ export class VerityRobot {
       specularIntensity: 0.18,
       bumpScale: 0.012,
     });
+    this.pupilMaterial = roundedMaterial(palette.mouth, 0.42, 0, {
+      specularIntensity: 0.85,
+      clearcoat: 0.7,
+      clearcoatRoughness: 0.24,
+    });
+
     this.mouthMaterial = roundedMaterial(palette.mouth, 0.82, 0, {
       specularIntensity: 0.16,
       bumpScale: 0.01,
@@ -327,6 +333,19 @@ export class VerityRobot {
     this.floatGroup.add(this.face);
 
     const eyeGeometry = new THREE.SphereGeometry(0.205, 32, 24);
+    /**
+     * Eyes with pupils.
+     *
+     * Two plain white ovals cannot look at anything — they change position, and
+     * a viewer reads that as the whole head shifting rather than as attention.
+     * A pupil is what makes a gaze legible: it travels further than the eye it
+     * sits in, so a small turn of the head reads as a deliberate look at a
+     * particular thing.
+     *
+     * The pupil is a child of the eye, so it inherits the blink for free.
+     */
+    const pupilGeometry = new THREE.SphereGeometry(0.115, 22, 16);
+
     this.eyes = [-0.7, 0.7].map((x) => {
       const eye = new THREE.Mesh(eyeGeometry, this.whiteMaterial);
       eye.scale.set(1, 1.16, 0.52);
@@ -334,6 +353,26 @@ export class VerityRobot {
       eye.userData.restX = x;
       eye.castShadow = true;
       eye.renderOrder = 4;
+
+      const pupil = new THREE.Mesh(pupilGeometry, this.pupilMaterial);
+      // Undo the eye's own squash so the pupil stays round inside it.
+      pupil.scale.set(1, 1 / 1.16, 1 / 0.52);
+      pupil.position.set(0, 0, 0.42);
+      pupil.renderOrder = 5;
+      eye.add(pupil);
+      eye.userData.pupil = pupil;
+
+      // A small specular highlight. It is the difference between an eye and a
+      // hole, and it costs one sphere.
+      const glint = new THREE.Mesh(
+        new THREE.SphereGeometry(0.042, 12, 10),
+        this.whiteMaterial,
+      );
+      glint.scale.set(1, 1 / 1.16, 1 / 0.52);
+      glint.position.set(-0.055, 0.062, 0.62);
+      glint.renderOrder = 6;
+      pupil.add(glint);
+
       this.floatGroup.add(eye);
       return eye;
     });
@@ -1085,8 +1124,29 @@ export class VerityRobot {
     // A squint is what actually reads as a smile on a face with no cheeks.
     const squint = 1 - delight * 0.42 - concern * 0.14;
 
+    /**
+     * Where the pupils point.
+     *
+     * `dragRotation` is where the head has turned to, and the pupil leads it —
+     * she looks with her eyes slightly before her head arrives, which is what
+     * makes the gaze read as intent rather than as a head on a spring.
+     */
+    const pupilX = THREE.MathUtils.clamp(-this.dragRotation.y * 1.9, -0.3, 0.3);
+    const pupilY = THREE.MathUtils.clamp(-this.dragRotation.x * 1.6, -0.22, 0.22);
+
     this.eyes.forEach((eye, index) => {
       eye.scale.y = 1.24 * blink * squint;
+
+      const pupil = eye.userData.pupil;
+      if (pupil) {
+        pupil.position.x = THREE.MathUtils.damp(pupil.position.x, pupilX, 13, deltaTime);
+        pupil.position.y = THREE.MathUtils.damp(
+          pupil.position.y,
+          pupilY / 1.16,
+          13,
+          deltaTime,
+        );
+      }
       eye.position.x = THREE.MathUtils.damp(
         eye.position.x,
         eye.userData.restX + this.dragRotation.y * 0.075,

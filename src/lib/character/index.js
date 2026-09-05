@@ -5,4 +5,8 @@ export {
   VerityRobot,
 } from "./VerityRobot.js";
 export { attachVerityDragControls, attachVerityPointerControls } from "./dragControls.js";
-export { createVerityStudioLights, frameVerityCamera } from "./studioLights.js";
+export {
+  createVerityShadowFloor,
+  createVerityStudioLights,
+  frameVerityCamera,
+} from "./studioLights.js";

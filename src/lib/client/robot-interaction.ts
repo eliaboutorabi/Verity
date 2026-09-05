@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import type { VerityRobot } from '$lib/robot/index.js';
+import type { VerityRobot } from '$lib/character/index.js';
 
 /**
  * Attach key pressing to a canvas.

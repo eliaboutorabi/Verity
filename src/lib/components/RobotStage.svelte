@@ -11,8 +11,9 @@
 	import {
 		VerityRobot,
 		attachVerityPointerControls,
+		createVerityShadowFloor,
 		createVerityStudioLights
-	} from '$lib/robot/index.js';
+	} from '$lib/character/index.js';
 	import { CHARACTERS, type CharacterId } from '$lib/voices';
 	import { printerEnvelope } from './printer-envelope.js';
 	import { playKey } from '$lib/client/keysound';
@@ -76,18 +77,20 @@
 	let bounds: { center: THREE.Vector3; size: THREE.Vector3 } | null = null;
 
 	/** Breathing room around the character, as a multiple of the fitted distance. */
-	const FRAME_PADDING = 1.14;
+	const FRAME_PADDING = 1.04;
 
 	function measure(character: VerityRobot): void {
 		const box = new THREE.Box3().setFromObject(character.object3d);
 		const size = box.getSize(new THREE.Vector3());
 		const center = box.getCenter(new THREE.Vector3());
 
-		// Headroom for the paper, and a nudge down so she sits slightly low in
-		// frame — which reads as standing on something rather than floating.
+		// Headroom for the paper above her, and room below for the shadow she
+		// casts — framing her tightly crops the shadow off and she goes back to
+		// floating in nothing.
 		const headroom = size.y * 0.3;
-		size.y += headroom;
-		center.y += headroom * 0.32;
+		const footroom = size.y * 0.12;
+		size.y += headroom + footroom;
+		center.y += headroom * 0.32 - footroom * 0.5;
 
 		bounds = { center, size };
 	}
@@ -177,6 +180,9 @@
 		// The interaction layer needs it at click time to cast a ray.
 		registerCamera(canvas, view);
 		world.add(createVerityStudioLights());
+		// A real cast shadow, not a blob behind the canvas: it moves with her
+		// float, her breath and her turn, because the same light makes it.
+		world.add(createVerityShadowFloor());
 		scene = world;
 
 		const gl = new THREE.WebGLRenderer({
@@ -346,21 +352,6 @@
 		opacity: 0.5;
 		filter: blur(14px);
 		transition: opacity 600ms var(--ease);
-	}
-
-	/* The contact shadow that stops her floating in nothing. */
-	.stage::after {
-		content: '';
-		position: absolute;
-		left: 50%;
-		bottom: 9%;
-		width: 44%;
-		height: 5%;
-		transform: translateX(-50%);
-		border-radius: 50%;
-		background: radial-gradient(closest-side, rgba(18, 22, 47, 0.22), transparent 72%);
-		filter: blur(7px);
-		pointer-events: none;
 	}
 
 	.stage[data-mode='speaking'] .glow {

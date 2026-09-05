@@ -8,7 +8,7 @@
  * documented in README.md, without editing vendored code.
  */
 
-import type { Camera, Group, Object3D, WebGLRenderer } from 'three';
+import type { Camera, Group, Mesh, Object3D, WebGLRenderer } from 'three';
 
 export type VerityAppearance = 'classic' | 'rose';
 export type VerityMode = 'idle' | 'listening' | 'thinking' | 'speaking';
@@ -102,5 +102,18 @@ export function attachVerityDragControls(
 ): () => void;
 
 export function createVerityStudioLights(options?: Record<string, unknown>): Group;
+
+/**
+ * An invisible floor that catches her shadow.
+ *
+ * Add it to the scene below her and enable `renderer.shadowMap`. Only the
+ * shadow renders; the plane itself is transparent, so it composites over the
+ * page background.
+ */
+export function createVerityShadowFloor(options?: {
+	y?: number;
+	size?: number;
+	opacity?: number;
+}): Mesh;
 
 export function frameVerityCamera(camera: Camera, aspect?: number): void;

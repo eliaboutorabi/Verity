@@ -475,38 +475,48 @@
 />
 
 <style>
+	/*
+	 * Layout.
+	 *
+	 * The previous version was a centred two-column card that stretched: at
+	 * 1920 everything was marooned in dead space, on a tall window the pieces
+	 * drifted apart, and on a phone she shrank to a postage stamp. The model
+	 * here is a workspace instead — a rail of a bounded width holding her, and
+	 * a work column that takes what is left with its text capped at a readable
+	 * measure. Nothing is vertically centred, because centred content moves
+	 * when the window does.
+	 */
+	/*
+	 * One row, not two. The bar is `position: fixed`, so it occupies no grid
+	 * row — declaring `auto 1fr` put `main` in the auto row at content height
+	 * and left the 1fr row empty, which is why the whole app sat in a band
+	 * across the top with the composer stranded under it.
+	 */
 	.app {
 		height: 100dvh;
-		display: flex;
-		flex-direction: column;
+		display: grid;
+		grid-template-rows: minmax(0, 1fr);
 	}
 
 	/* ------------------------------------------------------------------ bar */
 
-	/*
-	 * The bar floats over the content rather than sitting above it, so a long
-	 * answer scrolls up behind frosted glass instead of being clipped by a
-	 * hard edge. Thin, because it holds two controls and a name.
-	 */
 	.bar {
 		position: fixed;
 		inset: 0 0 auto;
 		z-index: 40;
-		height: 56px;
+		height: var(--bar-height);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		padding: 0 clamp(14px, 2.4vw, 30px);
-		background: color-mix(in srgb, var(--ground) 72%, transparent);
-		backdrop-filter: blur(18px) saturate(140%);
-		-webkit-backdrop-filter: blur(18px) saturate(140%);
+		padding: 0 clamp(14px, 2.6vw, 40px);
+		background: color-mix(in srgb, var(--ground) 70%, transparent);
+		backdrop-filter: blur(20px) saturate(150%);
+		-webkit-backdrop-filter: blur(20px) saturate(150%);
 		border-bottom: 1px solid transparent;
-		transition: border-color 200ms var(--ease);
+		transition: border-color 220ms var(--ease);
 	}
 
-	/* The rule appears only once something has scrolled behind the glass. The
-	   class is set by the transcript, hence :global. */
 	.app:has(:global(.scrolled)) .bar {
 		border-bottom-color: var(--line);
 	}
@@ -570,63 +580,54 @@
 	/* ----------------------------------------------------------------- main */
 
 	main {
-		flex: 1;
-		min-height: 0;
 		display: grid;
-		grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
-		gap: clamp(14px, 2.4vw, 34px);
-		padding: 0 clamp(14px, 2.4vw, 30px) clamp(12px, 1.6vw, 20px);
-		max-width: 1500px;
+		/* A rail, not a fraction: past ~420px she is a spectacle, not a colleague. */
+		grid-template-columns: clamp(288px, 25vw, 420px) minmax(0, 1fr);
+		/*
+		 * One row that fills. Without this the implicit row is `auto`, the
+		 * columns size to their content, and the whole app sits in a band
+		 * across the top of the window with the composer stranded under it.
+		 */
+		grid-template-rows: minmax(0, 1fr);
+		gap: clamp(18px, 2.6vw, 48px);
+		padding: calc(var(--bar-height) + 10px) clamp(14px, 2.6vw, 40px)
+			clamp(12px, 1.6vw, 22px);
 		width: 100%;
-		margin: 0 auto;
+		max-width: 1720px;
+		margin-inline: auto;
+		min-height: 0;
 	}
 
 	main > * {
 		min-width: 0;
 	}
 
-	/*
-	 * Three rows sized to their content, centred as a group. A `1fr` row for
-	 * her absorbed every spare pixel and left her stranded at the top of it
-	 * with the button a long way below.
-	 */
 	.stage-col {
 		display: grid;
-		grid-template-rows: auto auto minmax(0, auto);
-		align-content: center;
-		gap: 16px;
+		grid-template-rows: auto auto minmax(0, 1fr);
+		align-content: start;
+		gap: clamp(10px, 1.6vh, 20px);
 		min-height: 0;
-		padding-top: 56px;
-	}
-
-	/* The space under her, which used to be nothing. */
-	.deck {
-		border-top: 1px solid var(--line);
-		padding-top: 14px;
-		min-height: 0;
-		overflow-y: auto;
 	}
 
 	/*
-	 * No card. She sits on the page itself, with light pooled under her — a
-	 * bordered rectangle around a character reads as a widget, and she is
-	 * meant to read as someone in the room.
+	 * She sizes to the rail and squares off, so she is the same shape at every
+	 * width. `min-height: 0` on the row plus a viewport cap stops a short
+	 * window from letting her grow over the button below her.
 	 */
 	.stage-frame {
 		position: relative;
-		min-height: 0;
-		/* She is the thing people came to see; give her the room for it. */
-		width: min(100%, 480px);
-		height: min(46vh, 460px);
-		margin: 0 auto;
+		width: 100%;
+		aspect-ratio: 1;
+		max-height: min(40vh, 400px);
+		justify-self: center;
 	}
 
 	.controls {
 		display: grid;
 		justify-items: center;
-		gap: 10px;
+		gap: 9px;
 		text-align: center;
-		padding-bottom: 6px;
 	}
 
 	.status {
@@ -634,7 +635,15 @@
 		font-size: 12.5px;
 		line-height: 1.45;
 		color: var(--muted);
-		max-width: 30ch;
+		max-width: 32ch;
+	}
+
+	.deck {
+		border-top: 1px solid var(--line);
+		padding-top: 16px;
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
 
 	/* ------------------------------------------------------------ work col */
@@ -653,41 +662,53 @@
 		flex-direction: column;
 	}
 
-	/* Content clears the bar, then scrolls up under it. */
+	/*
+	 * A readable measure even on a very wide screen. The column may be 900px;
+	 * a paragraph should not be.
+	 */
+	.pane :global(.thread),
+	.opening,
+	.composer-slot,
+	.rail {
+		width: 100%;
+		max-width: 78ch;
+	}
+
 	.pane :global(.scroller) {
-		padding-top: 68px;
+		padding-top: 4px;
 	}
 
 	.opening {
 		flex: 1;
 		display: grid;
-		align-content: center;
+		align-content: start;
 		gap: 10px;
-		max-width: 52ch;
-		padding-top: 56px;
+		padding-top: clamp(8px, 6vh, 64px);
 	}
 
 	.opening h2 {
 		margin: 0;
-		font-size: clamp(25px, 3.2vw, 33px);
+		font-size: clamp(26px, 2.6vw, 38px);
 		font-weight: 700;
-		letter-spacing: -0.032em;
-		line-height: 1.12;
+		letter-spacing: -0.034em;
+		line-height: 1.1;
 	}
 
 	.opening p {
 		margin: 0;
-		font-size: 15px;
+		max-width: 54ch;
+		font-size: clamp(14.5px, 1.05vw, 16.5px);
 		line-height: 1.6;
 		color: var(--ink-soft);
 	}
 
 	.suggestions {
 		list-style: none;
-		margin: 12px 0 0;
+		margin: 14px 0 0;
 		padding: 0;
 		display: grid;
 		gap: 8px;
+		max-width: 62ch;
 	}
 
 	.suggestions button {
@@ -702,13 +723,15 @@
 		cursor: pointer;
 		box-shadow: var(--shadow-card);
 		transition:
-			transform 160ms var(--ease),
-			border-color 160ms var(--ease);
+			transform 180ms var(--ease),
+			border-color 180ms var(--ease),
+			box-shadow 180ms var(--ease);
 	}
 
 	.suggestions button:hover {
-		transform: translateX(3px);
+		transform: translateX(4px);
 		border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+		box-shadow: var(--shadow-float);
 	}
 
 	/* ----------------------------------------------------------------- rail */
@@ -748,51 +771,40 @@
 		flex: none;
 	}
 
-	/* --------------------------------------------------------------- mobile */
+	/* --------------------------------------------------------------- tablet */
 
-	/*
-	 * A phone gets the chat-app shape: the robot stays visible as a compact
-	 * band, the transcript scrolls in its own pane, and the composer never
-	 * leaves the bottom of the screen.
-	 */
-	@media (max-width: 900px) {
+	/* Below this the rail costs the transcript more than she is worth beside it. */
+	@media (max-width: 860px) {
 		main {
 			grid-template-columns: 1fr;
 			grid-template-rows: auto minmax(0, 1fr);
-			gap: 8px;
+			gap: 10px;
 			padding-bottom: max(10px, env(safe-area-inset-bottom));
 		}
 
 		.stage-col {
-			grid-template-columns: 112px minmax(0, 1fr);
+			grid-template-columns: auto minmax(0, 1fr);
 			grid-template-rows: none;
 			grid-template-areas: 'robot controls';
 			align-items: center;
-			gap: 14px;
-			padding-top: 60px;
+			gap: clamp(12px, 4vw, 24px);
 		}
 
-		/* On a phone the transcript needs the height more than the deck does. */
-		.deck {
-			display: none;
-		}
-
+		/*
+		 * Big enough to read as a character rather than a favicon, small enough
+		 * that the conversation still owns the screen.
+		 */
 		.stage-frame {
 			grid-area: robot;
-			width: 112px;
-			height: 112px;
-		}
-
-		.stage-col {
-			grid-template-rows: none;
+			width: clamp(112px, 30vw, 168px);
+			max-height: none;
 		}
 
 		.controls {
 			grid-area: controls;
 			justify-items: start;
 			text-align: left;
-			gap: 6px;
-			padding-bottom: 0;
+			gap: 7px;
 		}
 
 		.status {
@@ -800,28 +812,27 @@
 			font-size: 12px;
 		}
 
-		.pane :global(.scroller) {
-			padding-top: 6px;
+		.deck {
+			display: none;
 		}
 
 		.opening {
-			align-content: start;
-			padding-top: 4px;
+			padding-top: 2px;
 		}
 
 		.opening h2 {
-			font-size: 24px;
+			font-size: clamp(22px, 6vw, 28px);
 		}
 	}
 
-	@media (max-width: 900px) and (max-height: 680px) {
+	/* A short phone in landscape has no room for a character at all. */
+	@media (max-width: 860px) and (max-height: 560px) {
 		.stage-frame {
-			width: 92px;
-			height: 92px;
+			width: 84px;
 		}
 	}
 
-	@media (max-width: 400px) {
+	@media (max-width: 420px) {
 		.bar-button:not(.icon-only) span {
 			display: none;
 		}
