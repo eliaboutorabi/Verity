@@ -28,7 +28,7 @@ export interface Skill {
 }
 
 /** The tool-owning plugins a skill can require. */
-export type PackId = 'ecfr' | 'federal-register' | 'review' | 'critic';
+export type PackId = 'ecfr' | 'federal-register' | 'review' | 'critic' | 'brief';
 
 export const PACKS: Record<PackId, { name: string; detail: string }> = {
 	ecfr: {
@@ -46,6 +46,10 @@ export const PACKS: Record<PackId, { name: string; detail: string }> = {
 	critic: {
 		name: 'Second opinion',
 		detail: 'A separate model call that reads the answer back before you see it.'
+	},
+	brief: {
+		name: 'The brief',
+		detail: 'Findings and open questions written down as she goes, ready to take away.'
 	}
 };
 
@@ -67,6 +71,15 @@ const BUILTIN: Skill[] = [
 		packs: ['review', 'ecfr'],
 		instructions:
 			'When a document is loaded, review it before anything else. Report the findings in the order a reviewer would raise them — exposure first, tidy-ups last — and verify the significant ones against the regulation before you characterise them.'
+	},
+	{
+		id: 'brief',
+		name: 'Write it down as she goes',
+		builtin: true,
+		enabled: true,
+		packs: ['brief'],
+		instructions:
+			'Pin what matters to the brief while you work, not at the end: anything that needs acting on, watching or documenting, with the provision it rests on. Note what you could not settle as an open question rather than hedging in prose. Never pin a finding resting on a citation you did not read. Do not read the brief back — it is already on screen.'
 	},
 	{
 		id: 'plain-english',

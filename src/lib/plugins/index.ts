@@ -24,9 +24,10 @@ import { loopGuard, type PriorCall } from './loop-guard.js';
 import { reviewPlugin } from './review.js';
 import { verifyPlugin } from './verify.js';
 import { criticPlugin } from './critic.js';
+import { briefPlugin } from './brief.js';
 
 /** The plugins a caller can mount: tool packs, plus the optional critic. */
-export type PackId = 'ecfr' | 'federal-register' | 'review' | 'critic';
+export type PackId = 'ecfr' | 'federal-register' | 'review' | 'critic' | 'brief';
 
 /**
  * What a plugin needs to make a model call of its own.
@@ -77,13 +78,16 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Conte
 
 	if (options.credentials) ctx.provide('credentials', options.credentials);
 
-	const packs = new Set<PackId>(options.packs ?? ['ecfr', 'federal-register', 'review', 'critic']);
+	const packs = new Set<PackId>(
+		options.packs ?? ['ecfr', 'federal-register', 'review', 'critic', 'brief']
+	);
 	// The CFR is the whole point; a caller cannot leave the app with no way to
 	// look anything up.
 	packs.add('ecfr');
 
 	if (packs.has('ecfr')) await ctx.plugin(ecfrPlugin);
 	if (packs.has('federal-register')) await ctx.plugin(federalRegisterPlugin);
+	if (packs.has('brief')) await ctx.plugin(briefPlugin);
 	if (packs.has('review')) {
 		await ctx.plugin(reviewPlugin);
 		await ctx.plugin(highlightPlugin);

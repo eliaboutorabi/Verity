@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ToolRegistry } from '$lib/harness';
 import { createHarness } from './index.js';
 
-async function names(packs?: readonly ('ecfr' | 'federal-register' | 'review')[]) {
+async function names(
+	packs?: readonly ('ecfr' | 'federal-register' | 'review' | 'critic' | 'brief')[]
+) {
 	const ctx = await createHarness({ packs });
 	const list = ctx.require<ToolRegistry>('tools').names().sort();
 	ctx.dispose();
@@ -15,6 +17,8 @@ describe('tool packs', () => {
 			'find_rule_changes',
 			'highlight_document',
 			'list_documents',
+			'note_gap',
+			'pin_finding',
 			'read_regulation',
 			'review_document',
 			'search_regulations'
@@ -30,6 +34,12 @@ describe('tool packs', () => {
 
 	it('withholds rule-change lookups when that skill is off', async () => {
 		expect(await names(['ecfr', 'review'])).not.toContain('find_rule_changes');
+	});
+
+	it('withholds the brief when that skill is off', async () => {
+		const list = await names(['ecfr']);
+		expect(list).not.toContain('pin_finding');
+		expect(list).not.toContain('note_gap');
 	});
 
 	it('always keeps the CFR, whatever is asked for', async () => {

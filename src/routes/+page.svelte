@@ -8,8 +8,9 @@
 	 * which transport carries the turn.
 	 */
 	import { onMount, tick } from 'svelte';
-	import { Comment01Icon, Settings02Icon } from '@hugeicons/core-free-icons';
+	import { ClipboardIcon, Comment01Icon, Settings02Icon } from '@hugeicons/core-free-icons';
 	import Activity from '$lib/components/Activity.svelte';
+	import Brief from '$lib/components/Brief.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import DocumentViewer from '$lib/components/DocumentViewer.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -22,6 +23,7 @@
 	import { streamTurn } from '$lib/client/chat';
 	import { VoiceSession, type VoiceStatus } from '$lib/client/voice';
 	import { brain } from '$lib/state/brain.svelte';
+	import { brief } from '$lib/state/brief.svelte';
 	import { conversation } from '$lib/state/conversation.svelte';
 	import { documents } from '$lib/state/documents.svelte';
 	import { pages } from '$lib/state/pages.svelte';
@@ -34,6 +36,9 @@
 	let unlocked = $state(false);
 	let settingsOpen = $state(false);
 	let viewing = $state<string | null>(null);
+	let briefOpen = $state(false);
+	/** True once the window is wide enough for the brief to be a column. */
+	let wide = $state(false);
 
 	let voiceStatus = $state<VoiceStatus>('idle');
 	let voiceActive = $state(false);
@@ -82,6 +87,7 @@
 		onToolResult: (callId, isError, view, durationMs) => {
 			conversation.finishTool(callId, isError, view, durationMs);
 			absorbMarks(view as never);
+			absorbBrief(view as never);
 		},
 		onError: (message) => conversation.addNotice(message),
 		// Asked for at connect time, including after a reconnect, so a dropped
@@ -119,6 +125,12 @@
 	 * lives in this tab along with the file. So every finished tool result is
 	 * checked for marks, whichever transport carried it.
 	 */
+	/** Anything she wrote down lands in the brief, whichever mode wrote it. */
+	function absorbBrief(view?: { card: string } & Record<string, unknown>) {
+		if (view?.card !== 'brief') return;
+		brief.add(view.entries as never);
+	}
+
 	function absorbMarks(view?: { card: string } & Record<string, unknown>) {
 		if (view?.card !== 'highlight') return;
 		const documentId = view.documentId as string;
@@ -151,7 +163,17 @@
 			};
 		}
 
-		return () => voice.stop();
+		// The brief earns a column of its own only when there is a column to
+		// spare; below that it is a drawer, so it never squeezes the answer.
+		const columns = window.matchMedia('(min-width: 1280px)');
+		const sync = () => (wide = columns.matches);
+		sync();
+		columns.addEventListener('change', sync);
+
+		return () => {
+			columns.removeEventListener('change', sync);
+			voice.stop();
+		};
 	});
 
 	// The character drives the accent colour for the whole document.
@@ -226,7 +248,10 @@
 				signal: abort.signal
 			})) {
 				conversation.applyAgentEvent(event);
-				if (event.type === 'tool-result') absorbMarks(event.view as never);
+				if (event.type === 'tool-result') {
+					absorbMarks(event.view as never);
+					absorbBrief(event.view as never);
+				}
 				if (event.type === 'text') {
 					textStreaming = true;
 					stage?.appendTranscript(event.delta);
@@ -264,6 +289,8 @@
 		conversation.reset();
 		documents.clear();
 		pages.clear();
+		brief.clear();
+		briefOpen = false;
 		viewing = null;
 		stage?.clearTranscript();
 		settingsOpen = false;
@@ -348,6 +375,18 @@
 
 		<div class="bar-actions">
 			{#if unlocked}
+				{#if !wide && !brief.isEmpty}
+					<button
+						class="bar-button"
+						type="button"
+						onclick={() => (briefOpen = true)}
+						aria-label="Open the brief"
+					>
+						<Icon icon={ClipboardIcon} size={17} />
+						<span>Brief</span>
+						{#if brief.outstanding}<span class="pip">{brief.outstanding}</span>{/if}
+					</button>
+				{/if}
 				<button class="bar-button" type="button" onclick={startOver} disabled={conversation.isEmpty}>
 					<Icon icon={Comment01Icon} size={17} />
 					<span>New</span>
@@ -458,7 +497,24 @@
 				</div>
 			{/if}
 		</section>
+
+		{#if unlocked && wide}
+			<section class="brief-col">
+				<Brief />
+			</section>
+		{/if}
 	</main>
+
+	{#if briefOpen && !wide}
+		<div
+			class="scrim"
+			role="presentation"
+			onclick={() => (briefOpen = false)}
+		></div>
+		<div class="brief-drawer" role="dialog" aria-label="The brief">
+			<Brief drawer onclose={() => (briefOpen = false)} />
+		</div>
+	{/if}
 </div>
 
 <DocumentViewer documentId={viewing} onclose={() => (viewing = null)} />
@@ -769,6 +825,93 @@
 
 	.composer-slot {
 		flex: none;
+	}
+
+	/* ---------------------------------------------------------------- brief */
+
+	/*
+	 * The third column, and the answer to the dead space at 1920: past this
+	 * width there is room for the deliverable to sit beside the conversation
+	 * that produced it, so it does.
+	 */
+	@media (min-width: 1280px) {
+		main {
+			grid-template-columns: clamp(288px, 22vw, 400px) minmax(0, 1fr) clamp(280px, 22vw, 360px);
+		}
+	}
+
+	.brief-col {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		border-left: 1px solid var(--line);
+		padding-left: clamp(16px, 1.6vw, 28px);
+	}
+
+	.pip {
+		display: inline-grid;
+		place-items: center;
+		min-width: 17px;
+		height: 17px;
+		padding: 0 5px;
+		border-radius: 999px;
+		background: var(--accent);
+		color: var(--paper);
+		font-size: 10.5px;
+		font-weight: 700;
+	}
+
+	.scrim {
+		position: fixed;
+		inset: 0;
+		z-index: 45;
+		background: color-mix(in srgb, var(--ink) 32%, transparent);
+		backdrop-filter: blur(4px);
+		animation: fade 200ms var(--ease) both;
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
+	}
+
+	.brief-drawer {
+		position: fixed;
+		z-index: 46;
+		inset: auto 0 0;
+		max-height: min(76dvh, 640px);
+		background: var(--paper);
+		border-top: 1px solid var(--line);
+		border-radius: 22px 22px 0 0;
+		box-shadow: var(--shadow-float);
+		padding-bottom: max(8px, env(safe-area-inset-bottom));
+		animation: slide 280ms var(--ease) both;
+	}
+
+	@keyframes slide {
+		from {
+			transform: translateY(16px);
+			opacity: 0;
+		}
+	}
+
+	@media (min-width: 720px) {
+		.brief-drawer {
+			inset: 0 0 0 auto;
+			width: min(420px, 92vw);
+			max-height: none;
+			border-radius: 22px 0 0 22px;
+			border-top: 0;
+			border-left: 1px solid var(--line);
+		}
+
+		@keyframes slide {
+			from {
+				transform: translateX(20px);
+				opacity: 0;
+			}
+		}
 	}
 
 	/* --------------------------------------------------------------- tablet */

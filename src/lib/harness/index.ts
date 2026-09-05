@@ -18,6 +18,7 @@ export {
 	ToolCallError,
 	ToolRegistry,
 	toolsPlugin,
+	type BriefEntry,
 	type DocumentMark,
 	type RegulationCitation,
 	type ReviewFinding,

@@ -54,6 +54,15 @@ export type DocumentMark = {
 	severity: 'high' | 'medium' | 'low' | 'info';
 };
 
+/** One thing she has decided is worth writing down. */
+export type BriefEntry = {
+	kind: 'finding' | 'gap';
+	topic: string;
+	detail: string;
+	citation?: string;
+	severity: 'high' | 'medium' | 'low' | 'info';
+};
+
 /** One flagged passage from a reviewed document. */
 export type ReviewFinding = {
 	severity: 'high' | 'medium' | 'low' | 'info';
@@ -84,6 +93,7 @@ export type ToolResultView =
 			documentName: string;
 			marks: DocumentMark[];
 	  }
+	| { card: 'brief'; title: string; entries: BriefEntry[] }
 	| { card: 'error'; title: string; detail: string };
 
 // ---------------------------------------------------------------- definitions

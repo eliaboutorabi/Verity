@@ -49,6 +49,8 @@
 		changes: false,
 		review: true,
 		highlight: true,
+		// Already on screen in the brief; repeating it in the thread is noise.
+		brief: false,
 		error: true,
 		generic: false
 	};
@@ -83,6 +85,8 @@
 				return value.summary;
 			case 'highlight':
 				return `${value.marks.length} passage${value.marks.length === 1 ? '' : 's'} on ${value.documentName}`;
+			case 'brief':
+				return value.entries.map((entry) => entry.topic).join(' · ');
 			case 'error':
 				return value.detail;
 			default:
@@ -237,6 +241,16 @@
 						<span class="mark-quote">“{mark.quote}”</span>
 						<Icon icon={MapsLocation01Icon} size={15} />
 					</button>
+				</li>
+			{/each}
+		</ul>
+	{:else if result?.card === 'brief'}
+		<ul class="brief-echo">
+			{#each result.entries as entry, index (index)}
+				<li data-severity={entry.severity}>
+					<strong>{entry.topic}</strong>
+					{entry.detail}
+					{#if entry.citation}<span class="cite">{entry.citation}</span>{/if}
 				</li>
 			{/each}
 		</ul>
@@ -632,6 +646,45 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.brief-echo {
+		gap: 8px;
+		margin-top: 10px;
+	}
+
+	.brief-echo li {
+		padding: 9px 11px;
+		border-radius: 11px;
+		background: var(--paper);
+		border-left: 3px solid var(--severity-info);
+		font-size: 13px;
+		line-height: 1.5;
+		color: var(--ink-soft);
+	}
+
+	.brief-echo li[data-severity='high'] {
+		border-left-color: var(--severity-high);
+	}
+	.brief-echo li[data-severity='medium'] {
+		border-left-color: var(--severity-medium);
+	}
+
+	.brief-echo strong {
+		display: block;
+		font-weight: 640;
+		color: var(--ink);
+	}
+
+	.brief-echo .cite {
+		display: inline-block;
+		margin-top: 4px;
+		font-size: 10.5px;
+		font-weight: 700;
+		color: var(--accent);
+		background: var(--accent-soft);
+		border-radius: 999px;
+		padding: 2px 7px;
 	}
 
 	.failure {
