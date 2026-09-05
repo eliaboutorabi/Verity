@@ -7,8 +7,9 @@
 	 * text share one transcript and one tool registry; the only difference is
 	 * which transport carries the turn.
 	 */
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { Comment01Icon, Settings02Icon } from '@hugeicons/core-free-icons';
+	import Activity from '$lib/components/Activity.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import DocumentViewer from '$lib/components/DocumentViewer.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -268,6 +269,60 @@
 		settingsOpen = false;
 	}
 
+	/** Shown under her before she has done anything, in place of empty space. */
+	const CAPABILITIES = [
+		'Search and read the live CFR',
+		'Check the Federal Register for changes',
+		'Review a document and mark the page'
+	];
+
+	/**
+	 * She looks at what just happened.
+	 *
+	 * A character that never looks at anything is a screensaver. When a card
+	 * lands she turns to it; when she starts answering she turns back to the
+	 * reader, because that is who the answer is for. The gaze releases itself
+	 * after a few seconds, so she is never left staring.
+	 */
+	$effect(() => {
+		const last = conversation.entries.at(-1);
+		if (!last) return;
+
+		void tick().then(() => {
+			if (last.kind === 'tool') {
+				const cards = document.querySelectorAll('.thread article.card');
+				stage?.look(cards[cards.length - 1] ?? null);
+
+				// A high finding is worth a flicker of concern; it is the moment
+				// she would look up at you across a desk.
+				if (last.state === 'done' && last.result?.card === 'review') {
+					const worst = last.result.findings[0]?.severity;
+					if (worst === 'high') stage?.react('concern');
+				}
+				if (last.state === 'done' && last.result?.card === 'highlight') {
+					stage?.react('nod');
+				}
+			} else if (last.kind === 'assistant') {
+				// Back to the reader. Nothing to aim at, so hand her to the pointer.
+				stage?.look(null);
+			}
+		});
+	});
+
+	/**
+	 * Her keys do something.
+	 *
+	 * Not a gimmick if it is useful: equals asks her to sum up where the
+	 * conversation has got to, which is the thing you actually want after five
+	 * lookups. The others are ambient — they click, she likes it, nothing else
+	 * happens.
+	 */
+	function onKeyPress(index: number) {
+		if (index !== 3 || !unlocked || textBusy) return;
+		if (conversation.isEmpty) return;
+		send('Sum up where we have got to, in three sentences.');
+	}
+
 	const SUGGESTIONS = [
 		'What has to be true for a business meal to be deductible?',
 		'What does the CFR say about classifying a worker as a contractor?',
@@ -320,6 +375,7 @@
 					{audioLevel}
 					{audible}
 					printing={textStreaming}
+					onkeypress={onKeyPress}
 				/>
 			</div>
 
@@ -339,6 +395,12 @@
 					<p class="status">Interrupting is fine.</p>
 				{/if}
 			</div>
+
+			{#if unlocked}
+				<div class="deck">
+					<Activity hints={CAPABILITIES} />
+				</div>
+			{/if}
 		</section>
 
 		<section class="work-col">
@@ -523,13 +585,26 @@
 		min-width: 0;
 	}
 
+	/*
+	 * Three rows sized to their content, centred as a group. A `1fr` row for
+	 * her absorbed every spare pixel and left her stranded at the top of it
+	 * with the button a long way below.
+	 */
 	.stage-col {
 		display: grid;
-		grid-template-rows: minmax(0, 1fr) auto;
+		grid-template-rows: auto auto minmax(0, auto);
 		align-content: center;
-		gap: 14px;
+		gap: 16px;
 		min-height: 0;
 		padding-top: 56px;
+	}
+
+	/* The space under her, which used to be nothing. */
+	.deck {
+		border-top: 1px solid var(--line);
+		padding-top: 14px;
+		min-height: 0;
+		overflow-y: auto;
 	}
 
 	/*
@@ -540,10 +615,9 @@
 	.stage-frame {
 		position: relative;
 		min-height: 0;
-		/* She has a comfortable size; past it a tall window just inflates her. */
-		width: 100%;
-		max-width: 400px;
-		max-height: min(46vh, 430px);
+		/* She is the thing people came to see; give her the room for it. */
+		width: min(100%, 480px);
+		height: min(46vh, 460px);
 		margin: 0 auto;
 	}
 
@@ -690,7 +764,7 @@
 		}
 
 		.stage-col {
-			grid-template-columns: 104px minmax(0, 1fr);
+			grid-template-columns: 112px minmax(0, 1fr);
 			grid-template-rows: none;
 			grid-template-areas: 'robot controls';
 			align-items: center;
@@ -698,10 +772,19 @@
 			padding-top: 60px;
 		}
 
+		/* On a phone the transcript needs the height more than the deck does. */
+		.deck {
+			display: none;
+		}
+
 		.stage-frame {
 			grid-area: robot;
-			width: 104px;
-			height: 104px;
+			width: 112px;
+			height: 112px;
+		}
+
+		.stage-col {
+			grid-template-rows: none;
 		}
 
 		.controls {
@@ -733,8 +816,8 @@
 
 	@media (max-width: 900px) and (max-height: 680px) {
 		.stage-frame {
-			width: 84px;
-			height: 84px;
+			width: 92px;
+			height: 92px;
 		}
 	}
 

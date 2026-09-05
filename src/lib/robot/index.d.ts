@@ -12,6 +12,8 @@ import type { Camera, Group, Object3D, WebGLRenderer } from 'three';
 
 export type VerityAppearance = 'classic' | 'rose';
 export type VerityMode = 'idle' | 'listening' | 'thinking' | 'speaking';
+/** A momentary reaction, distinct from the behavioural {@link VerityMode}. */
+export type VerityExpression = 'neutral' | 'delight' | 'concern' | 'nod';
 
 export interface VerityRobotOptions {
 	/** Lets the receipt texture use the device's maximum anisotropy. */
@@ -36,6 +38,8 @@ export class VerityRobot {
 	readonly object3d: Group;
 	readonly root: Group;
 	readonly mouth: Object3D;
+	/** The keypad, in reading order: +, −, ×, =. */
+	readonly keys: Object3D[];
 
 	paperProgress: number;
 	paperFeedDistance: number;
@@ -46,6 +50,20 @@ export class VerityRobot {
 	receiptLines: { id: number; text: string; feedPosition: number }[];
 
 	setMode(mode: VerityMode): void;
+
+	/** Press a key by index. It travels and springs back on its own. */
+	pressKey(index: number): boolean;
+	/** How far a key is depressed, 0–1 — for a caller driving sound. */
+	keyPressAmount(index: number): number;
+	/** React for a moment. Decays on its own; fire and forget. */
+	react(kind?: VerityExpression, strength?: number): void;
+	/**
+	 * Look at something, taking `weight` of her attention from the pointer.
+	 * Same units as {@link setDragRotation}.
+	 */
+	lookAt(pitch: number, yaw: number, weight?: number): void;
+	/** Hand her attention back to the pointer. */
+	releaseGaze(): void;
 	/** Mouth amplitude and paper flutter. Call every audio-analysis frame. */
 	setAudioLevel(level: number): void;
 	/** Keep true while output is genuinely audible, not merely in progress. */

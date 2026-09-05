@@ -54,16 +54,18 @@ test.describe('a conversation', () => {
 		await unlock(page);
 	});
 
-	test('renders the answer, the regulation card and the citation rail', async ({ page }) => {
+	test('renders the answer, a quiet card and the citation rail', async ({ page }) => {
 		await page.getByLabel('Message Verity').fill('What substantiates travel?');
 		await page.getByRole('button', { name: 'Send message' }).click();
 
 		await expect(page.getByText('What substantiates travel?')).toBeVisible();
 
+		// A search result is scaffolding: it collapses to one line so the answer
+		// below it is the thing you read first.
 		const card = page.locator('article.card');
 		await expect(card).toHaveAttribute('data-state', 'done');
-		await expect(card).toContainText('26 CFR § 1.274-5');
-		await expect(card).toContainText('Substantiation requirements.');
+		await expect(card).toContainText('2 sections for “substantiation requirements”');
+		await expect(card.locator('.hits')).toHaveCount(0);
 
 		await expect(page.getByText(/You need the amount, time, place/)).toBeVisible();
 		// Markdown is rendered rather than shown as asterisks.
@@ -72,6 +74,28 @@ test.describe('a conversation', () => {
 		const rail = page.locator('.rail a');
 		await expect(rail).toHaveCount(2);
 		await expect(rail.first()).toHaveAttribute('href', /ecfr\.gov/);
+	});
+
+	test('a collapsed card opens on click and stays open', async ({ page }) => {
+		await page.getByLabel('Message Verity').fill('What substantiates travel?');
+		await page.getByRole('button', { name: 'Send message' }).click();
+
+		const head = page.locator('button.head').first();
+		await expect(head).toHaveAttribute('aria-expanded', 'false');
+		await head.click();
+
+		await expect(head).toHaveAttribute('aria-expanded', 'true');
+		await expect(page.locator('article.card .hits li')).toHaveCount(2);
+		await expect(page.getByText('Substantiation requirements.')).toBeVisible();
+	});
+
+	test('what she is doing appears beside her, not in the conversation', async ({ page }) => {
+		await page.getByLabel('Message Verity').fill('What substantiates travel?');
+		await page.getByRole('button', { name: 'Send message' }).click();
+
+		const doing = page.getByRole('region', { name: 'What Verity is doing' });
+		await expect(doing).toContainText('Searching the eCFR');
+		await expect(doing).toContainText('2 sections');
 	});
 
 	test('a suggestion starts a turn', async ({ page }) => {

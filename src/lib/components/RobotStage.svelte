@@ -15,6 +15,8 @@
 	} from '$lib/robot/index.js';
 	import { CHARACTERS, type CharacterId } from '$lib/voices';
 	import { printerEnvelope } from './printer-envelope.js';
+	import { playKey } from '$lib/client/keysound';
+	import { attachKeyPresses, gazeAtElement, registerCamera } from '$lib/client/robot-interaction';
 
 	interface Props {
 		character: CharacterId;
@@ -27,6 +29,8 @@
 		 * answer prints onto the paper exactly as a spoken one does.
 		 */
 		printing?: boolean;
+		/** Someone pressed one of her keys. Index is +, −, ×, = in order. */
+		onkeypress?: (index: number) => void;
 	}
 
 	let {
@@ -34,7 +38,8 @@
 		mode,
 		audioLevel = 0,
 		audible = false,
-		printing = false
+		printing = false,
+		onkeypress
 	}: Props = $props();
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
@@ -43,6 +48,8 @@
 	let scene: THREE.Scene | null = null;
 	let camera: THREE.PerspectiveCamera | null = null;
 	let detachPointer: (() => void) | null = null;
+	let detachKeys: (() => void) | null = null;
+	let gazeRelease: ReturnType<typeof setTimeout> | undefined;
 	/** Flips once the scene exists, which is what gates the character effect. */
 	let ready = $state(false);
 
@@ -125,6 +132,30 @@
 		robot?.clearTranscript();
 	}
 
+	/**
+	 * Look at something on the page.
+	 *
+	 * Callers pass an element — the card that just appeared, the panel she is
+	 * filling in — and she turns toward it for a few seconds before handing her
+	 * attention back to the pointer.
+	 */
+	export function look(element: Element | null, hold = 2600): void {
+		if (!robot || !canvas) return;
+		clearTimeout(gazeRelease);
+
+		if (!element) {
+			robot.releaseGaze();
+			return;
+		}
+		if (!gazeAtElement(robot, canvas, element)) return;
+		gazeRelease = setTimeout(() => robot?.releaseGaze(), hold);
+	}
+
+	/** React for a moment: delight, concern, or a nod. */
+	export function react(kind: 'delight' | 'concern' | 'nod' = 'delight'): void {
+		robot?.react(kind);
+	}
+
 	/** A snapshot of the character's animation state, for tests and debugging. */
 	export function debugState() {
 		if (!robot) return null;
@@ -143,6 +174,8 @@
 		const world = new THREE.Scene();
 		const view = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
 		camera = view;
+		// The interaction layer needs it at click time to cast a ray.
+		registerCamera(canvas, view);
 		world.add(createVerityStudioLights());
 		scene = world;
 
@@ -226,6 +259,18 @@
 		robot = next;
 		detachPointer = attachVerityPointerControls(canvas, next);
 
+		// Her keys are hers to press, and pressing one should feel like
+		// something happened: it travels, it clicks, and she likes it.
+		detachKeys = attachKeyPresses(
+			canvas,
+			() => robot,
+			(index) => {
+				playKey(index);
+				next.react('delight', index === 3 ? 1 : 0.7);
+				onkeypress?.(index);
+			}
+		);
+
 		// Measure before the first frame moves her, then reframe — until a
 		// character existed there was nothing to fit the camera to.
 		measure(next);
@@ -239,6 +284,9 @@
 		return () => {
 			detachPointer?.();
 			detachPointer = null;
+			detachKeys?.();
+			detachKeys = null;
+			clearTimeout(gazeRelease);
 			next.dispose();
 			if (robot === next) robot = null;
 		};
@@ -252,7 +300,10 @@
 
 <div class="stage" data-mode={mode}>
 	<div class="glow" aria-hidden="true"></div>
-	<canvas bind:this={canvas} aria-label="Verity, an animated calculator robot"></canvas>
+	<canvas
+		bind:this={canvas}
+		aria-label="Verity, an animated calculator robot. Her keys can be pressed."
+	></canvas>
 </div>
 
 <style>

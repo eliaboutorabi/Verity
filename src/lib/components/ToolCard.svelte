@@ -8,6 +8,7 @@
 	 */
 	import {
 		Alert02Icon,
+		ArrowDown01Icon,
 		BookOpen01Icon,
 		CheckmarkCircle02Icon,
 		File01Icon,
@@ -31,6 +32,65 @@
 	const result = $derived(entry.result);
 	const call = $derived(entry.call);
 	let expanded = $state(false);
+
+	/**
+	 * Whether a card opens itself.
+	 *
+	 * Not a single rule, because the cards are not equally worth reading. A
+	 * search is scaffolding — five sections she then narrowed down, and showing
+	 * all of it buries the answer that follows. A review or a set of marks is
+	 * the work product, and hiding that is hiding the point. Errors always
+	 * open, because a silent failure is how someone comes to trust a wrong
+	 * answer.
+	 */
+	const OPENS_ITSELF: Record<string, boolean> = {
+		results: false,
+		regulation: false,
+		changes: false,
+		review: true,
+		highlight: true,
+		error: true,
+		generic: false
+	};
+
+	let open = $state(false);
+	let touched = $state(false);
+
+	$effect(() => {
+		// Follows the card's own default until someone decides otherwise.
+		if (touched || !result) return;
+		open = OPENS_ITSELF[result.card] ?? false;
+	});
+
+	function toggle() {
+		touched = true;
+		open = !open;
+	}
+
+	/** The line a collapsed card has to earn its place with. */
+	const summary = $derived.by(() => {
+		if (entry.state === 'running') return '';
+		const value = result;
+		if (!value) return '';
+		switch (value.card) {
+			case 'results':
+				return `${value.hits.length} section${value.hits.length === 1 ? '' : 's'} for “${value.query}”`;
+			case 'regulation':
+				return `${value.section.citation} — ${value.section.heading}`;
+			case 'changes':
+				return `${value.changes.length} document${value.changes.length === 1 ? '' : 's'} for “${value.query}”`;
+			case 'review':
+				return value.summary;
+			case 'highlight':
+				return `${value.marks.length} passage${value.marks.length === 1 ? '' : 's'} on ${value.documentName}`;
+			case 'error':
+				return value.detail;
+			default:
+				return value.title;
+		}
+	});
+
+	const collapsible = $derived(entry.state !== 'running' && result?.card !== 'error');
 
 	const REGULATION_PREVIEW = 900;
 
@@ -56,17 +116,34 @@
 </script>
 
 <article class="card" data-state={entry.state} aria-busy={entry.state === 'running'}>
-	<header>
+	{#snippet head()}
 		<span class="glyph" aria-hidden="true">
 			<Icon {icon} size={14} />
 		</span>
-		<span class="label">{entry.label}</span>
+		<span class="head-text">
+			<span class="label">{entry.label}</span>
+			{#if summary}<span class="summary">{summary}</span>{/if}
+		</span>
 		{#if entry.state === 'running'}
 			<span class="timing">working…</span>
 		{:else if entry.durationMs !== undefined}
 			<span class="timing">{(entry.durationMs / 1000).toFixed(1)}s</span>
 		{/if}
-	</header>
+	{/snippet}
+
+	{#if collapsible}
+		<button class="head" type="button" aria-expanded={open} onclick={toggle}>
+			{@render head()}
+			<span class="chevron" class:open aria-hidden="true">
+				<Icon icon={ArrowDown01Icon} size={15} />
+			</span>
+		</button>
+	{:else}
+		<div class="head">{@render head()}</div>
+	{/if}
+
+	{#if open || entry.state === 'running' || result?.card === 'error'}
+	<div class="body-slot">
 
 	{#if entry.state === 'running'}
 		<p class="pending">
@@ -169,6 +246,8 @@
 		<p class="lead">{result.title}</p>
 		{#if result.detail}<p class="excerpt">{result.detail}</p>{/if}
 	{/if}
+	</div>
+	{/if}
 </article>
 
 <style>
@@ -190,15 +269,74 @@
 		}
 	}
 
-	header {
+	.head {
 		display: flex;
 		align-items: center;
 		gap: 9px;
+		width: 100%;
+		text-align: left;
+		border: 0;
+		background: none;
+		padding: 0;
+		font: inherit;
 		font-size: 11px;
 		font-weight: 700;
 		letter-spacing: 0.07em;
 		text-transform: uppercase;
 		color: var(--muted);
+	}
+
+	button.head {
+		cursor: pointer;
+	}
+
+	button.head:hover .label {
+		color: var(--accent);
+	}
+
+	.head-text {
+		flex: 1;
+		min-width: 0;
+		display: grid;
+		gap: 2px;
+	}
+
+	/*
+	 * The line a collapsed card lives or dies by. Sentence case and full size,
+	 * because it is the content — the label above it is the chrome.
+	 */
+	.summary {
+		font-size: 13px;
+		font-weight: 520;
+		letter-spacing: -0.005em;
+		text-transform: none;
+		color: var(--ink-soft);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.chevron {
+		display: grid;
+		place-items: center;
+		flex: none;
+		color: var(--muted);
+		transition: transform 200ms var(--ease);
+	}
+
+	.chevron.open {
+		transform: rotate(180deg);
+	}
+
+	.body-slot {
+		animation: open 220ms var(--ease) both;
+	}
+
+	@keyframes open {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
 	}
 
 	.glyph {
@@ -228,11 +366,11 @@
 	}
 
 	.label {
-		flex: 1;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		transition: color 160ms var(--ease);
 	}
 
 	.timing {

@@ -200,6 +200,28 @@ export class VerityRobot {
     const palette = VERITY_APPEARANCES[appearance] ?? VERITY_APPEARANCES.classic;
     this.root = new THREE.Group();
     this.root.name = "VerityRobot";
+
+    /**
+     * A short-lived facial reaction, on top of whatever else she is doing.
+     *
+     * Expressions decay on their own rather than being switched off, so a
+     * caller can fire one and forget it: `react("delight")` and she brightens
+     * for a beat and settles. `mode` stays the behavioural state; this is the
+     * momentary one.
+     */
+    this.expression = { kind: "neutral", amount: 0, decay: 1.6 };
+
+    /**
+     * Where she is deliberately looking, and how much it overrides the
+     * ambient pointer-following.
+     *
+     * Kept separate from `dragRotation` so the two compose instead of
+     * fighting: the pointer gives her idle life, `lookAt` aims her at
+     * something that just happened, and releasing it hands her back.
+     */
+    this.gazeTarget = new THREE.Vector2(0, 0);
+    this.gazeWeight = 0;
+    this.gazeWeightTarget = 0;
     this.floatGroup = new THREE.Group();
     this.root.add(this.floatGroup);
 
@@ -347,6 +369,9 @@ export class VerityRobot {
       this.floatGroup.add(group);
       return group;
     });
+
+    // Per-key press springs. Driven by pressKey(), released on their own.
+    this.keyPress = this.keys.map(() => ({ amount: 0, velocity: 0 }));
 
     this.hands = [-1, 1].map((side) => {
       const hand = makeSoftCylinder(0.28, 0.33, 0.055, this.ivorySide);
@@ -712,6 +737,56 @@ export class VerityRobot {
     this.outputAudioActive = active;
   }
 
+  /**
+   * Press one of her keys.
+   *
+   * `index` is the keypad in reading order: +, −, ×, =. The key travels and
+   * springs back; the caller supplies the sound and, if it wants one, the
+   * reaction.
+   */
+  pressKey(index) {
+    const spring = this.keyPress?.[index];
+    if (!spring) return false;
+    spring.amount = 1;
+    spring.velocity = 0;
+    return true;
+  }
+
+  /** How far a key is currently depressed, 0–1. For a caller driving sound. */
+  keyPressAmount(index) {
+    return this.keyPress?.[index]?.amount ?? 0;
+  }
+
+  /**
+   * React for a moment.
+   *
+   * `delight` brightens and squints, `concern` narrows and tilts, `nod` is a
+   * short agreement. All decay on their own.
+   */
+  react(kind = "delight", strength = 1) {
+    this.expression = {
+      kind,
+      amount: THREE.MathUtils.clamp(strength, 0, 1),
+      decay: kind === "nod" ? 2.4 : 1.6,
+    };
+  }
+
+  /**
+   * Look at something.
+   *
+   * `pitch` and `yaw` are in the same units as `setDragRotation`. `weight`
+   * decides how much of her attention it takes from the pointer; passing 0
+   * (or calling `releaseGaze`) hands her back.
+   */
+  lookAt(pitch, yaw, weight = 1) {
+    this.gazeTarget.set(pitch, yaw);
+    this.gazeWeightTarget = THREE.MathUtils.clamp(weight, 0, 1);
+  }
+
+  releaseGaze() {
+    this.gazeWeightTarget = 0;
+  }
+
   setDragRotation(pitch, yaw) {
     this.dragRotationTarget.set(pitch, yaw);
   }
@@ -915,24 +990,47 @@ export class VerityRobot {
     const listeningEnergy = this.mode === "listening" ? 0.12 : 0;
     const energy = speakingEnergy + listeningEnergy;
 
-    this.dragRotation.x = THREE.MathUtils.damp(
-      this.dragRotation.x,
+    // Deliberate gaze blends over the ambient pointer target rather than
+    // replacing it, so handing attention back is a fade and not a snap.
+    this.gazeWeight = THREE.MathUtils.damp(
+      this.gazeWeight,
+      this.gazeWeightTarget,
+      4.5,
+      deltaTime,
+    );
+    const aimX = THREE.MathUtils.lerp(
       this.dragRotationTarget.x,
-      11,
-      deltaTime,
+      this.gazeTarget.x,
+      this.gazeWeight,
     );
-    this.dragRotation.y = THREE.MathUtils.damp(
-      this.dragRotation.y,
+    const aimY = THREE.MathUtils.lerp(
       this.dragRotationTarget.y,
-      11,
-      deltaTime,
+      this.gazeTarget.y,
+      this.gazeWeight,
     );
+
+    this.dragRotation.x = THREE.MathUtils.damp(this.dragRotation.x, aimX, 11, deltaTime);
+    this.dragRotation.y = THREE.MathUtils.damp(this.dragRotation.y, aimY, 11, deltaTime);
+
+    // Expressions fade rather than being switched off, so a caller can fire
+    // one and forget it.
+    if (this.expression.amount > 0) {
+      this.expression.amount = Math.max(
+        0,
+        this.expression.amount - deltaTime * this.expression.decay,
+      );
+    }
+    const delight = this.expression.kind === "delight" ? this.expression.amount : 0;
+    const concern = this.expression.kind === "concern" ? this.expression.amount : 0;
+    const nod = this.expression.kind === "nod" ? this.expression.amount : 0;
     const floatY = Math.sin(time * (0.7 + energy * 0.08)) * (0.052 + energy * 0.01);
     this.floatGroup.position.y = floatY * motionScale;
     this.floatGroup.rotation.z =
       Math.sin(time * 0.52) * 0.014 * motionScale;
     this.floatGroup.rotation.x =
-      Math.sin(time * 0.42 + 1.3) * 0.01 * motionScale + this.dragRotation.x;
+      Math.sin(time * 0.42 + 1.3) * 0.01 * motionScale
+      + this.dragRotation.x
+      + Math.sin(nod * Math.PI) * 0.14;
     this.floatGroup.rotation.y = this.dragRotation.y;
     this.updateSecondaryMotion(deltaTime, motionScale);
 
@@ -940,7 +1038,8 @@ export class VerityRobot {
     this.body.scale.set(breath, breath, breath);
 
     const isVoicing = this.audioLevel > 0.025;
-    const mouthMotion = 1 + this.audioLevel * 1.36;
+    // Delight deepens the smile arc and widens it; concern flattens it.
+    const mouthMotion = 1 + this.audioLevel * 1.36 + delight * 0.5 - concern * 0.32;
     this.mouth.scale.y = THREE.MathUtils.damp(
       this.mouth.scale.y,
       mouthMotion,
@@ -949,7 +1048,7 @@ export class VerityRobot {
     );
     this.mouth.scale.x = THREE.MathUtils.damp(
       this.mouth.scale.x,
-      1 - this.audioLevel * 0.115,
+      1 - this.audioLevel * 0.115 + delight * 0.22,
       22,
       deltaTime,
     );
@@ -961,7 +1060,7 @@ export class VerityRobot {
     );
     this.mouth.rotation.z = THREE.MathUtils.damp(
       this.mouth.rotation.z,
-      0,
+      concern * 0.16,
       12,
       deltaTime,
     );
@@ -983,8 +1082,11 @@ export class VerityRobot {
       }
     }
 
+    // A squint is what actually reads as a smile on a face with no cheeks.
+    const squint = 1 - delight * 0.42 - concern * 0.14;
+
     this.eyes.forEach((eye, index) => {
-      eye.scale.y = 1.24 * blink;
+      eye.scale.y = 1.24 * blink * squint;
       eye.position.x = THREE.MathUtils.damp(
         eye.position.x,
         eye.userData.restX + this.dragRotation.y * 0.075,
@@ -1004,7 +1106,21 @@ export class VerityRobot {
       const keyPulse = this.mode === "thinking" && index === 3
         ? Math.sin(time * 3.6) * 0.025
         : 0;
-      key.position.z = 0.96 + keyPulse;
+
+      // Critically damped: the key drops on press and rises without wobbling,
+      // which is what a real key does and what the sound expects.
+      const spring = this.keyPress[index];
+      if (spring.amount > 0 || spring.velocity !== 0) {
+        spring.velocity += (0 - spring.amount) * 260 * deltaTime;
+        spring.velocity *= Math.exp(-22 * deltaTime);
+        spring.amount = Math.max(0, spring.amount + spring.velocity * deltaTime);
+        if (spring.amount < 0.001 && Math.abs(spring.velocity) < 0.01) {
+          spring.amount = 0;
+          spring.velocity = 0;
+        }
+      }
+
+      key.position.z = 0.96 + keyPulse - spring.amount * 0.22;
     });
 
     if (this.outputAudioActive) {
