@@ -37,6 +37,8 @@ export class VerityRobot {
 
 	readonly object3d: Group;
 	readonly root: Group;
+	/** Everything that floats, breathes and turns; the root itself never moves. */
+	readonly floatGroup: Group;
 	readonly mouth: Object3D;
 	/** The keypad, in reading order: +, −, ×, =. */
 	readonly keys: Object3D[];
@@ -106,16 +108,19 @@ export function attachVerityDragControls(
 export function createVerityStudioLights(options?: Record<string, unknown>): Group;
 
 /**
- * An invisible floor that catches her shadow.
+ * A soft shadow pooled on the ground beneath her.
  *
- * Add it to the scene below her and enable `renderer.shadowMap`. Only the
- * shadow renders; the plane itself is transparent, so it composites over the
- * page background.
+ * Add `object3d` to the scene and call `follow(robot)` once a frame, before
+ * rendering, so the shadow slides under her float and fades as she rises. It
+ * needs no shadow map: the blur is drawn into its texture.
  */
-export function createVerityShadowFloor(options?: {
+export function createVeritySoftShadow(options?: {
+	width?: number;
+	height?: number;
 	y?: number;
-	size?: number;
+	lean?: number;
 	opacity?: number;
-}): Mesh;
+	color?: number;
+}): { object3d: Mesh; follow(robot: VerityRobot): void };
 
 export function frameVerityCamera(camera: Camera, aspect?: number): void;

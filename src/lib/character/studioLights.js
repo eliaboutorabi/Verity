@@ -43,28 +43,107 @@ export function createVerityStudioLights({
 }
 
 /**
- * A floor that catches her shadow and is otherwise invisible.
+ * A soft shadow pooled on the ground beneath her.
  *
- * A CSS blob under the canvas cannot move with her: she floats, breathes and
- * turns, and a shadow that ignores all of that reads as a sticker. This is a
- * real plane with a `ShadowMaterial`, so the shadow is cast by the same light
- * that lights her and moves with everything she does.
+ * The obvious approach — a real cast shadow on a `ShadowMaterial` floor — does
+ * not work for a character who floats in an empty frame. The camera looks at
+ * her horizontally, so the floor is seen almost edge-on and the shadow lands
+ * as a hard, foreshortened smear that runs off the bottom of the canvas.
  *
- * Nothing else about it renders — the plane itself is fully transparent, so it
- * composites over whatever the page background happens to be.
+ * This is a blurred ellipse instead, sitting below her and turned to face the
+ * lens, leaned back just far enough to read as ground rather than as a disc
+ * hanging in the air. Facing the camera is the whole trick: a plane laid flat
+ * projects to a two-pixel hairline from this camera height, however wide it
+ * is. It cannot be truncated, because it is barely wider than she is and sits
+ * inside her framing; it has no edge, because the blur is drawn into its
+ * texture; and it still belongs to her, because `follow` slides it under her
+ * float and shrinks and fades it as she rises, which is what says she is off
+ * the ground.
  */
-export function createVerityShadowFloor({ y = -3.05, size = 26, opacity = 0.24 } = {}) {
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(size, size),
-    new THREE.ShadowMaterial({ opacity, transparent: true }),
+export function createVeritySoftShadow({
+  width = 6,
+  height = 1.38,
+  y = -3.24,
+  lean = 0.3,
+  opacity = 0.44,
+  color = 0x1d1836,
+} = {}) {
+  const texture = new THREE.CanvasTexture(drawBlurredPool());
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      color,
+      transparent: true,
+      opacity,
+      // Under everything, and never writes depth, so nothing of hers can
+      // punch a hole in it.
+      depthWrite: false,
+      toneMapped: false,
+    }),
   );
-  floor.name = "VerityShadowFloor";
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = y;
-  floor.receiveShadow = true;
-  // Never occludes her, whatever the camera does.
-  floor.renderOrder = -1;
-  return floor;
+  mesh.name = "VeritySoftShadow";
+  mesh.renderOrder = -1;
+  // Facing the lens, leaned back a little at the top, so it sits under her as
+  // ground rather than standing up as a wall.
+  mesh.rotation.x = -lean;
+
+  const material = mesh.material;
+
+  return {
+    object3d: mesh,
+    /** Places the shadow for this frame, given the character it belongs to. */
+    follow(robot) {
+      const scale = robot.object3d.scale.x;
+      const float = robot.floatGroup.position.y;
+      const yaw = robot.floatGroup.rotation.y;
+      // How far off the ground she is, as a fraction of her float range.
+      const lift = Math.min(Math.max(float / 0.062, -1), 1);
+
+      mesh.position.set(yaw * 0.9 * scale, y * scale, 0);
+      mesh.scale.set(
+        width * (1 - lift * 0.07) * scale,
+        height * (1 - lift * 0.07) * scale,
+        1,
+      );
+      material.opacity = opacity * (1 - lift * 0.14);
+    },
+  };
+}
+
+/**
+ * The pool itself: a soft circle, drawn once.
+ *
+ * The falloff is hand-stopped rather than linear. A straight gradient fades
+ * evenly and reads as a grey disc; a shadow is dense in the middle and gives
+ * up quickly at the rim, so most of the alpha is spent in the first third.
+ */
+function drawBlurredPool(size = 256) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+
+  const half = size / 2;
+  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+  const stops = [
+    [0, 1],
+    [0.32, 0.72],
+    [0.55, 0.36],
+    [0.75, 0.12],
+    [0.9, 0.02],
+    [1, 0],
+  ];
+  for (const [offset, alpha] of stops) {
+    gradient.addColorStop(offset, `rgba(255, 255, 255, ${alpha})`);
+  }
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  return canvas;
 }
 
 export function frameVerityCamera(camera, aspect = 1) {

@@ -8,8 +8,14 @@ export const VERITY_MODES = Object.freeze({
   SPEAKING: "speaking",
 });
 
-/** How far a pupil travels before it would leave the white of the eye. */
-const EYE_RADIUS_REACH = 0.072;
+/**
+ * How far a pupil travels before it would leave the white of the eye.
+ *
+ * The gap between the eye radius and the pupil radius, less a hair. A large
+ * anime pupil fills most of the eye, so the room to move is small — the head
+ * does the rest of the work.
+ */
+const EYE_RADIUS_REACH = 0.07;
 
 export const VERITY_APPEARANCES = Object.freeze({
   classic: Object.freeze({
@@ -335,7 +341,7 @@ export class VerityRobot {
     this.face.receiveShadow = false;
     this.floatGroup.add(this.face);
 
-    const eyeGeometry = new THREE.SphereGeometry(0.205, 32, 24);
+    const eyeGeometry = new THREE.SphereGeometry(0.235, 32, 24);
     /**
      * Eyes with pupils.
      *
@@ -351,8 +357,17 @@ export class VerityRobot {
      * and threw it a clear unit in front of her face, where it read as a
      * floating white ball rather than a highlight.
      */
-    const EYE_RADIUS = 0.205;
-    const PUPIL_RADIUS = 0.101;
+    const EYE_RADIUS = 0.235;
+    /**
+     * A big pupil, filling most of the eye.
+     *
+     * A small dark bead in a white oval reads as a doll. What makes a face
+     * like this likeable is the anime proportion: an iris taking two-thirds of
+     * the eye, one large highlight up and to one side, and a smaller one
+     * opposite it. The two highlights are what make it look wet rather than
+     * printed.
+     */
+    const PUPIL_RADIUS = EYE_RADIUS * 0.68;
 
     this.eyes = [-0.7, 0.7].map((x) => {
       const eye = new THREE.Mesh(eyeGeometry, this.whiteMaterial);
@@ -362,30 +377,43 @@ export class VerityRobot {
       eye.castShadow = true;
       eye.renderOrder = 4;
 
+      /*
+       * The eye is squashed to (1, 1.16, 0.52), so anything parented to it
+       * inherits that squash. This group carries the inverse once, and
+       * everything inside it is therefore in round, unsquashed units — which
+       * is the only way to reason about where the front of the eye is.
+       */
       const pupilGroup = new THREE.Group();
       pupilGroup.scale.set(1, 1 / 1.16, 1 / 0.52);
       eye.add(pupilGroup);
 
-      // A lens rather than a ball: flattened against the front of the eye so
-      // it sits on the surface instead of bulging out of it.
+      // A lens rather than a ball: flattened onto the front of the eye so it
+      // sits on the surface instead of bulging out of it.
       const pupil = new THREE.Mesh(
-        new THREE.SphereGeometry(PUPIL_RADIUS, 24, 18),
+        new THREE.SphereGeometry(PUPIL_RADIUS, 28, 20),
         this.pupilMaterial,
       );
-      pupil.scale.z = 0.42;
-      pupil.position.z = EYE_RADIUS * 0.52 * 0.86;
+      pupil.scale.z = 0.3;
+      pupil.position.z = EYE_RADIUS * 0.52 * 0.92;
       pupil.renderOrder = 5;
       pupilGroup.add(pupil);
 
-      // The highlight. It is the difference between an eye and a hole, and it
-      // costs one small sphere.
-      const glint = new THREE.Mesh(
-        new THREE.SphereGeometry(PUPIL_RADIUS * 0.3, 12, 10),
-        this.whiteMaterial,
-      );
-      glint.position.set(-PUPIL_RADIUS * 0.34, PUPIL_RADIUS * 0.36, pupil.position.z + 0.026);
-      glint.renderOrder = 6;
-      pupilGroup.add(glint);
+      const highlight = (radius, offsetX, offsetY, forward) => {
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(radius, 14, 12),
+          this.whiteMaterial,
+        );
+        mesh.scale.z = 0.5;
+        mesh.position.set(offsetX, offsetY, pupil.position.z + forward);
+        mesh.renderOrder = 6;
+        pupilGroup.add(mesh);
+        return mesh;
+      };
+
+      // The big one up and to the left, the small one opposite. Two is what
+      // reads as wet; one reads as a sticker.
+      highlight(PUPIL_RADIUS * 0.34, -PUPIL_RADIUS * 0.34, PUPIL_RADIUS * 0.36, 0.02);
+      highlight(PUPIL_RADIUS * 0.17, PUPIL_RADIUS * 0.36, -PUPIL_RADIUS * 0.34, 0.018);
 
       eye.userData.pupilGroup = pupilGroup;
       this.floatGroup.add(eye);
@@ -1081,6 +1109,15 @@ export class VerityRobot {
     this.floatGroup.position.y = floatY * motionScale;
     this.floatGroup.rotation.z =
       Math.sin(time * 0.52) * 0.014 * motionScale;
+    /*
+     * Pitch: positive means she is looking *down*.
+     *
+     * Rotating about +X by a positive angle sends the face normal (0, 0, 1) to
+     * (0, -sin, cos) — downward. So this adds, and the pupils, which move to
+     * `-dragRotation.x`, travel down with it. Everything upstream — the
+     * pointer, `lookAt` — uses the same sign, so screen-down is look-down all
+     * the way through.
+     */
     this.floatGroup.rotation.x =
       Math.sin(time * 0.42 + 1.3) * 0.01 * motionScale
       + this.dragRotation.x
@@ -1150,9 +1187,21 @@ export class VerityRobot {
      * her looking right, and a pupil that slid left instead was the single
      * most unsettling thing about her.
      */
-    const REACH = EYE_RADIUS_REACH;
-    const pupilX = THREE.MathUtils.clamp(this.dragRotation.y * 0.32, -REACH, REACH);
-    const pupilY = THREE.MathUtils.clamp(-this.dragRotation.x * 0.34, -REACH, REACH);
+    /*
+     * Clamped as a vector, not per axis.
+     *
+     * Clamping x and y separately allows a diagonal of `reach * sqrt(2)`,
+     * which for a pupil this large puts the corner of her gaze outside the
+     * white. Scaling the whole offset keeps the pupil on the eye in every
+     * direction and preserves the angle she is looking in.
+     */
+    let pupilX = this.dragRotation.y * 0.32;
+    let pupilY = -this.dragRotation.x * 0.34;
+    const reach = Math.hypot(pupilX, pupilY);
+    if (reach > EYE_RADIUS_REACH) {
+      pupilX *= EYE_RADIUS_REACH / reach;
+      pupilY *= EYE_RADIUS_REACH / reach;
+    }
 
     this.eyes.forEach((eye, index) => {
       eye.scale.y = 1.24 * blink * squint;

@@ -1,17 +1,45 @@
 import * as THREE from "three";
 
 /**
+ * Where she should be looking, given a pointer anywhere on the page.
+ *
+ * `Math.tanh` rather than a clamp. A clamp saturates: past roughly one canvas
+ * away she hit the limit and stopped responding, so moving the pointer down
+ * to the composer — or off the bottom of the window — looked exactly like her
+ * losing track of it. tanh is near-linear close to her, so small movements
+ * still read precisely, and approaches the limit without ever reaching it, so
+ * she keeps answering the pointer however far away it goes.
+ *
+ * Exported because it is the whole behaviour, and a pure function of a
+ * rectangle and a point is worth being able to test.
+ */
+export function followRotation(bounds, clientX, clientY, {
+  maxPitch = 0.28,
+  maxYaw = 0.34,
+} = {}) {
+  const centerX = bounds.left + bounds.width / 2;
+  const centerY = bounds.top + bounds.height / 2;
+  const horizontalReach = Math.max(bounds.width * 0.92, 1);
+  const verticalReach = Math.max(bounds.height * 0.95, 1);
+
+  return {
+    pitch: Math.tanh((clientY - centerY) / verticalReach) * maxPitch,
+    yaw: Math.tanh((clientX - centerX) / horizontalReach) * maxYaw,
+  };
+}
+
+/**
  * Makes the robot follow a mouse and remain draggable on touch screens without
  * making the robot itself depend on DOM input.
  * Returns a cleanup function for component unmounting or scene disposal.
  */
 export function attachVerityPointerControls(element, robot, {
-  maxPitch = 0.18,
+  maxPitch = 0.34,
   maxYaw = 0.85,
   pitchSensitivity = 0.9,
   yawSensitivity = 1.55,
   followMouse = true,
-  followMaxPitch = 0.12,
+  followMaxPitch = 0.28,
   followMaxYaw = 0.34,
   trackingElement = window,
   resetOnDoubleClick = true,
@@ -52,25 +80,13 @@ export function attachVerityPointerControls(element, robot, {
 
   const handleMouseFollow = (event) => {
     if (!followMouse || event.pointerType !== "mouse" || pointerId !== null) return;
-    const bounds = element.getBoundingClientRect();
-    const centerX = bounds.left + bounds.width / 2;
-    const centerY = bounds.top + bounds.height / 2;
-    const horizontalReach = Math.max(bounds.width * 0.92, 1);
-    const verticalReach = Math.max(bounds.height * 1.45, 1);
-    const normalizedX = THREE.MathUtils.clamp(
-      (event.clientX - centerX) / horizontalReach,
-      -1,
-      1,
+    const { pitch, yaw } = followRotation(
+      element.getBoundingClientRect(),
+      event.clientX,
+      event.clientY,
+      { maxPitch: followMaxPitch, maxYaw: followMaxYaw },
     );
-    const normalizedY = THREE.MathUtils.clamp(
-      (event.clientY - centerY) / verticalReach,
-      -1,
-      1,
-    );
-    robot.setDragRotation(
-      normalizedY * followMaxPitch,
-      normalizedX * followMaxYaw,
-    );
+    robot.setDragRotation(pitch, yaw);
   };
 
   const finishDrag = (event) => {
@@ -88,7 +104,15 @@ export function attachVerityPointerControls(element, robot, {
   element.addEventListener("pointerup", finishDrag);
   element.addEventListener("pointercancel", finishDrag);
   trackingElement.addEventListener("pointermove", handleMouseFollow);
-  window.addEventListener("blur", resetRotation);
+  /*
+   * No reset when the window loses focus.
+   *
+   * Moving the pointer off the bottom of the screen — onto a dock, another
+   * app — blurs the window, and snapping her head back to centre at that exact
+   * moment is precisely what reads as losing track. Holding the last direction
+   * is both more lifelike and what someone watching expects: she is still
+   * looking where the pointer went, and picks it up again when it comes back.
+   */
   if (resetOnDoubleClick) element.addEventListener("dblclick", resetRotation);
 
   return () => {
@@ -97,7 +121,6 @@ export function attachVerityPointerControls(element, robot, {
     element.removeEventListener("pointerup", finishDrag);
     element.removeEventListener("pointercancel", finishDrag);
     trackingElement.removeEventListener("pointermove", handleMouseFollow);
-    window.removeEventListener("blur", resetRotation);
     if (resetOnDoubleClick) element.removeEventListener("dblclick", resetRotation);
   };
 }

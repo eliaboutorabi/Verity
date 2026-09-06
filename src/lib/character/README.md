@@ -14,16 +14,17 @@ import * as THREE from 'three';
 import {
   VerityRobot,
   attachVerityPointerControls,
-  createVerityShadowFloor,
+  createVeritySoftShadow,
   createVerityStudioLights
 } from '$lib/character/index.js';
 
 const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-renderer.shadowMap.enabled = true;          // she casts a real shadow
+renderer.shadowMap.enabled = true;          // self-shadowing, for form
 
 const scene = new THREE.Scene();
 scene.add(createVerityStudioLights());
-scene.add(createVerityShadowFloor());        // invisible; catches the shadow
+const shadow = createVeritySoftShadow();     // blurred, behind her
+scene.add(shadow.object3d);
 
 const verity = new VerityRobot({ renderer });
 scene.add(verity.object3d);
@@ -31,6 +32,7 @@ const releasePointer = attachVerityPointerControls(canvas, verity);
 
 // Once per frame:
 verity.update(now / 1000, delta);
+shadow.follow(verity);
 ```
 
 Pass the renderer so the receipt texture can use the device's maximum

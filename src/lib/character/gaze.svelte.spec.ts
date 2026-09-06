@@ -10,7 +10,13 @@
 
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { VerityRobot } from './index.js';
+import { VerityRobot, createVeritySoftShadow } from './index.js';
+
+/** The sphere radius a mesh was built with, before any squash is applied. */
+function radiusOf(mesh: THREE.Object3D) {
+	const geometry = (mesh as THREE.Mesh).geometry as THREE.SphereGeometry;
+	return geometry.parameters.radius;
+}
 
 /** Advance enough frames for the damped pupil to arrive. */
 function settle(robot: VerityRobot, seconds = 1.5) {
@@ -59,9 +65,23 @@ describe('gaze', () => {
 		robot.setDragRotation(5, 5); // far past anything the controls produce
 		settle(robot);
 
-		const pupil = pupilOf(robot, 0);
-		expect(Math.abs(pupil.position.x)).toBeLessThanOrEqual(0.075);
-		expect(Math.abs(pupil.position.y)).toBeLessThanOrEqual(0.075);
+		const group = pupilOf(robot, 0);
+		// Measured, not guessed: however large the pupil grows, the travel plus
+		// its own radius has to stay within the eye, or she looks cross-eyed.
+		const room = radiusOf(robot.eyes[0]) - radiusOf(group.children[0]);
+		expect(Math.hypot(group.position.x, group.position.y)).toBeLessThanOrEqual(room);
+		robot.dispose();
+	});
+
+	it('gives her big anime pupils rather than beads', () => {
+		const robot = new VerityRobot();
+		const pupil = pupilOf(robot, 0).children[0];
+
+		// A small dark dot in a white oval reads as a doll. Two-thirds of the
+		// eye is what makes her look like she is actually looking at you.
+		expect(radiusOf(pupil) / radiusOf(robot.eyes[0])).toBeGreaterThan(0.6);
+		// And two highlights — one large, one small — so the eye reads as wet.
+		expect(pupilOf(robot, 0).children.length).toBe(3);
 		robot.dispose();
 	});
 
@@ -101,6 +121,31 @@ describe('gaze', () => {
 		const world = glint.getWorldPosition(new THREE.Vector3());
 		const eyeWorld = robot.eyes[0].getWorldPosition(new THREE.Vector3());
 		expect(world.z - eyeWorld.z).toBeLessThan(0.2);
+		robot.dispose();
+	});
+
+	it('pools her shadow on the ground and lifts it as she floats', () => {
+		const robot = new VerityRobot();
+		const shadow = createVeritySoftShadow();
+
+		robot.floatGroup.position.y = 0;
+		shadow.follow(robot);
+		const resting = shadow.object3d.scale.x;
+		const restingOpacity = (shadow.object3d.material as THREE.MeshBasicMaterial).opacity;
+
+		// Below her body, which reaches to -3.
+		expect(shadow.object3d.position.y).toBeLessThan(-2.5);
+		// Leaned back, rather than standing bolt upright behind her.
+		expect(shadow.object3d.rotation.x).toBeLessThan(0);
+
+		robot.floatGroup.position.y = 0.062;
+		shadow.follow(robot);
+
+		// Off the ground: smaller and fainter, which is what sells the float.
+		expect(shadow.object3d.scale.x).toBeLessThan(resting);
+		expect((shadow.object3d.material as THREE.MeshBasicMaterial).opacity).toBeLessThan(
+			restingOpacity
+		);
 		robot.dispose();
 	});
 

@@ -11,7 +11,7 @@
 	import {
 		VerityRobot,
 		attachVerityPointerControls,
-		createVerityShadowFloor,
+		createVeritySoftShadow,
 		createVerityStudioLights
 	} from '$lib/character/index.js';
 	import { CHARACTERS, type CharacterId } from '$lib/voices';
@@ -48,6 +48,7 @@
 	let renderer: THREE.WebGLRenderer | null = null;
 	let scene: THREE.Scene | null = null;
 	let camera: THREE.PerspectiveCamera | null = null;
+	let shadow: ReturnType<typeof createVeritySoftShadow> | null = null;
 	let detachPointer: (() => void) | null = null;
 	let detachKeys: (() => void) | null = null;
 	let gazeRelease: ReturnType<typeof setTimeout> | undefined;
@@ -93,7 +94,8 @@
 		 * top edge while it runs; she is worth more than the last inch of it.
 		 */
 		const headroom = size.y * 0.13;
-		const footroom = size.y * 0.07;
+		// Enough that her shadow has somewhere to fall.
+		const footroom = size.y * 0.12;
 		size.y += headroom + footroom;
 		center.y += headroom * 0.32 - footroom * 0.5;
 
@@ -171,6 +173,17 @@
 			...robot.getState(),
 			inputs: { ...inputs },
 			outputAudioActive: (robot as unknown as { outputAudioActive: boolean }).outputAudioActive,
+			// Where she and her shadow land in the frame, in normalised device
+			// coordinates: -1 is the bottom edge, 1 the top. The one number that
+			// says whether either is being cut off.
+			frame: camera
+				? {
+						feet: robot.object3d.localToWorld(new THREE.Vector3(0, -3, 0.94)).project(camera).y,
+						shadow: shadow
+							? shadow.object3d.getWorldPosition(new THREE.Vector3()).project(camera).y
+							: null
+					}
+				: null,
 			paperFeedDistance: robot.paperFeedDistance,
 			paperProgress: robot.paperProgress
 		};
@@ -185,9 +198,10 @@
 		// The interaction layer needs it at click time to cast a ray.
 		registerCamera(canvas, view);
 		world.add(createVerityStudioLights());
-		// A real cast shadow, not a blob behind the canvas: it moves with her
-		// float, her breath and her turn, because the same light makes it.
-		world.add(createVerityShadowFloor());
+		// Soft, blurred, and hers: it follows her float and parallaxes against
+		// her turn, rather than sitting behind the canvas as a static blob.
+		shadow = createVeritySoftShadow();
+		world.add(shadow.object3d);
 		scene = world;
 
 		const gl = new THREE.WebGLRenderer({
@@ -238,6 +252,7 @@
 					robot.setOutputAudioActive(inputs.audible);
 				}
 				robot.update(now / 1000, delta);
+				shadow?.follow(robot);
 			}
 			gl.render(world, view);
 		};
