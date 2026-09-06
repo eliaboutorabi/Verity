@@ -10,6 +10,11 @@
 	import { onMount, tick } from 'svelte';
 	import { MOUTH_AT_REST, type MouthPose } from '$lib/client/lipsync';
 	import { extractText } from '$lib/client/extract';
+	import StarterCard from '$lib/components/StarterCard.svelte';
+	import BookOpenText from '@jis3r/icons/icons/book-open-text';
+	import CircleQuestionMark from '@jis3r/icons/icons/circle-question-mark';
+	import Gavel from '@jis3r/icons/icons/gavel';
+	import ScanText from '@jis3r/icons/icons/scan-text';
 	import {
 		ClipboardIcon,
 		Comment01Icon,
@@ -423,11 +428,42 @@
 		send('Sum up where we have got to, in three sentences.');
 	}
 
-	const SUGGESTIONS = [
-		'What has to be true for a business meal to be deductible?',
-		'What does the CFR say about classifying a worker as a contractor?',
-		'Teach me how the CFR treats substantiation of travel expenses.',
-		'Quiz me on passive activity losses.'
+	/**
+	 * What the app is for, as four ways in.
+	 *
+	 * Templates rather than prompts. Three grey pills of sentences somebody
+	 * could have typed themselves said nothing about what this thing does; these
+	 * say it, and pressing one starts it.
+	 */
+	const STARTERS = [
+		{
+			icon: Gavel,
+			title: 'Look up a rule',
+			detail: 'Searches the live CFR, reads the section, and cites what it read.',
+			action: 'Ask about a business meal',
+			run: () => send('What has to be true for a business meal to be deductible?')
+		},
+		{
+			icon: ScanText,
+			title: 'Review a document',
+			detail: 'Names the passages a reviewer would stop at, and the rule behind each.',
+			action: 'Try a specimen letter',
+			run: () => reviewSample()
+		},
+		{
+			icon: BookOpenText,
+			title: 'Learn a rule properly',
+			detail: 'A lesson on screen: what it says, what turns on it, where people slip.',
+			action: 'Substantiating travel',
+			run: () => send('Teach me how the CFR treats substantiation of travel expenses.')
+		},
+		{
+			icon: CircleQuestionMark,
+			title: 'Sit an exam',
+			detail: 'Questions with the hints and the answer held back until you ask.',
+			action: 'Passive activity losses',
+			run: () => send('Quiz me on passive activity losses. One question at a time.')
+		}
 	];
 
 	/**
@@ -444,6 +480,12 @@
 	];
 
 	let loadingSample = $state<string | null>(null);
+
+	/** Load the engagement letter and set her on it, in one press. */
+	async function reviewSample() {
+		await loadSample(SAMPLES[2]);
+		if (documents.total) await send('Review this and tell me what worries you.');
+	}
 
 	async function loadSample(sample: { name: string; file: string }) {
 		loadingSample = sample.file;
@@ -574,22 +616,32 @@
 								Verity reads the live Code of Federal Regulations before she answers, and cites what
 								she read.
 							</p>
-							<ul class="suggestions">
-								{#each SUGGESTIONS as suggestion (suggestion)}
+							<ul class="starters">
+								{#each STARTERS as starter (starter.title)}
 									<li>
-										<button type="button" onclick={() => send(suggestion)}>{suggestion}</button>
+										<StarterCard
+											icon={starter.icon}
+											title={starter.title}
+											detail={starter.detail}
+											action={starter.action}
+											busy={loadingSample !== null}
+											onclick={starter.run}
+										/>
 									</li>
 								{/each}
 							</ul>
 
 							<p class="samples">
-								No document to hand?
-								{#each SAMPLES as sample, index (sample.file)}<button
+								<span>Or try a specimen:</span>
+								{#each SAMPLES as sample (sample.file)}
+									<button
 										type="button"
 										disabled={loadingSample !== null}
 										onclick={() => loadSample(sample)}
-										>{loadingSample === sample.file ? 'Reading…' : sample.name}</button
-									>{#if index < SAMPLES.length - 1}<span aria-hidden="true"> · </span>{/if}{/each}
+									>
+										{loadingSample === sample.file ? 'Reading…' : sample.name}
+									</button>
+								{/each}
 							</p>
 						</div>
 					{:else}
@@ -888,40 +940,37 @@
 		color: var(--ink-soft);
 	}
 
-	.suggestions {
+	.starters {
 		list-style: none;
-		margin: 14px 0 0;
+		margin: 20px 0 0;
 		padding: 0;
 		display: grid;
-		gap: 8px;
-		max-width: 62ch;
+		gap: 12px;
+		max-width: 78ch;
 	}
 
-	.suggestions button {
-		width: 100%;
-		text-align: left;
-		/*
-		 * Openings, not primary actions. Filled cards with a drop shadow read
-		 * as three heavy slabs before anyone has asked anything; a hairline on
-		 * a barely-there surface leaves the heading the loudest thing on the
-		 * page, which is what it should be.
-		 */
-		border: 1px solid var(--line);
-		background: color-mix(in srgb, var(--surface) 55%, transparent);
-		border-radius: 14px;
-		padding: 12px 16px;
-		font-size: 14.5px;
-		line-height: 1.45;
-		color: var(--ink-soft);
-		cursor: pointer;
-		transition:
-			transform 180ms var(--ease),
-			border-color 180ms var(--ease),
-			box-shadow 180ms var(--ease);
+	/* Equal heights: four cards of different lengths should still be one block. */
+	.starters li {
+		display: flex;
+	}
+
+	/*
+	 * Two across as soon as there is room. One column of four reads as a menu;
+	 * a 2×2 block reads as a set of things the app does, which is what it is.
+	 */
+	@media (min-width: 620px) {
+		.starters {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
 	}
 
 	.samples {
-		margin: 14px 0 0;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 4px 14px;
+		margin: 16px 0 0;
+		max-width: 78ch;
 		font-size: 13px;
 		color: var(--muted);
 	}
@@ -945,14 +994,6 @@
 	.samples button:disabled {
 		color: var(--muted);
 		cursor: default;
-	}
-
-	.suggestions button:hover {
-		transform: translateX(4px);
-		color: var(--ink);
-		background: var(--surface);
-		border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
-		box-shadow: var(--shadow-card);
 	}
 
 	/* ----------------------------------------------------------------- rail */

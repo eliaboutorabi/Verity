@@ -14,8 +14,8 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173, paste a key with Realtime access, and press **Talk
-to Verity**. Text mode works with any key.
+Open http://localhost:5173, paste a key with Realtime access, and press the
+microphone. Text mode works with any key.
 
 ---
 

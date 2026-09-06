@@ -9,7 +9,9 @@ export default defineConfig({
 		noExternal: [
 			// Ships raw .svelte files; Vite must compile it rather than hand it to
 			// Node's ESM loader, which has no idea what a .svelte file is.
-			'@hugeicons/svelte'
+			'@hugeicons/svelte',
+			// Same reason: the animated icons ship as .svelte sources.
+			'@jis3r/icons'
 		]
 	},
 	plugins: [

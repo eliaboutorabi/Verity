@@ -134,9 +134,25 @@ test.describe('a conversation', () => {
 		await expect(doing).toContainText('2 sections');
 	});
 
-	test('a suggestion starts a turn', async ({ page }) => {
-		await page.getByRole('button', { name: /business meal to be deductible/ }).click();
+	test('a starter card starts a turn', async ({ page }) => {
+		await page.getByRole('button', { name: /Look up a rule/ }).click();
 		await expect(page.locator('article.card')).toBeVisible();
+	});
+
+	test('the icon on a starter animates when the card is hovered', async ({ page }) => {
+		// Unlocking left the pointer wherever the Start button was, and the cards
+		// render under it — so park the mouse somewhere harmless before asking
+		// what the resting state looks like.
+		await page.mouse.move(4, 4);
+		const card = page.getByRole('button', { name: /Sit an exam/ });
+		const icon = card.locator('svg');
+		await expect(icon).not.toHaveClass(/animate/);
+
+		// The animation belongs to the card, not the icon: an icon that only
+		// moves when the pointer lands on the icon itself is a fingernail-sized
+		// target that nobody finds.
+		await card.hover();
+		await expect(icon).toHaveClass(/animate/);
 	});
 
 	test('New clears the thread and the citations', async ({ page }) => {
