@@ -9,6 +9,7 @@
 	 */
 	import { onMount, tick } from 'svelte';
 	import { MOUTH_AT_REST, type MouthPose } from '$lib/client/lipsync';
+	import { extractText } from '$lib/client/extract';
 	import {
 		ClipboardIcon,
 		Comment01Icon,
@@ -421,8 +422,40 @@
 	const SUGGESTIONS = [
 		'What has to be true for a business meal to be deductible?',
 		'What does the CFR say about classifying a worker as a contractor?',
-		'Any recent IRS rule-making on the research credit?'
+		'Teach me how the CFR treats substantiation of travel expenses.',
+		'Quiz me on passive activity losses.'
 	];
+
+	/**
+	 * Documents to try, for someone who arrived without one.
+	 *
+	 * Specimens, not anybody's paperwork — every party and figure in them is
+	 * invented — but written the way the real thing is written, so the review
+	 * has something to actually bite on rather than a paragraph of keywords.
+	 */
+	const SAMPLES = [
+		{ name: 'Residential lease', file: 'residential-lease-1420-maple.pdf' },
+		{ name: 'Contractor agreement', file: 'contractor-agreement-northbridge.pdf' },
+		{ name: 'Engagement letter', file: 'engagement-letter-brightline.pdf' }
+	];
+
+	let loadingSample = $state<string | null>(null);
+
+	async function loadSample(sample: { name: string; file: string }) {
+		loadingSample = sample.file;
+		try {
+			const response = await fetch(`/samples/${sample.file}`);
+			if (!response.ok) throw new Error('That sample could not be fetched.');
+			const file = new File([await response.blob()], sample.file, { type: 'application/pdf' });
+			documents.add(sample.file, await extractText(file), 'file', file);
+		} catch (cause) {
+			conversation.addNotice(
+				cause instanceof Error ? cause.message : 'That sample could not be loaded.'
+			);
+		} finally {
+			loadingSample = null;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -544,6 +577,16 @@
 									</li>
 								{/each}
 							</ul>
+
+							<p class="samples">
+								No document to hand?
+								{#each SAMPLES as sample, index (sample.file)}<button
+										type="button"
+										disabled={loadingSample !== null}
+										onclick={() => loadSample(sample)}
+										>{loadingSample === sample.file ? 'Reading…' : sample.name}</button
+									>{#if index < SAMPLES.length - 1}<span aria-hidden="true"> · </span>{/if}{/each}
+							</p>
 						</div>
 					{:else}
 						<Transcript onshow={showOnPage} onsend={send} />
@@ -871,6 +914,33 @@
 			transform 180ms var(--ease),
 			border-color 180ms var(--ease),
 			box-shadow 180ms var(--ease);
+	}
+
+	.samples {
+		margin: 14px 0 0;
+		font-size: 13px;
+		color: var(--muted);
+	}
+
+	.samples button {
+		border: 0;
+		background: none;
+		padding: 0;
+		font: inherit;
+		color: var(--accent);
+		cursor: pointer;
+		text-decoration: underline;
+		text-underline-offset: 3px;
+		text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
+
+	.samples button:hover:not(:disabled) {
+		text-decoration-color: currentColor;
+	}
+
+	.samples button:disabled {
+		color: var(--muted);
+		cursor: default;
 	}
 
 	.suggestions button:hover {
