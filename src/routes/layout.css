@@ -38,6 +38,8 @@
 	 */
 	--cta: var(--ink);
 	--cta-ink: var(--paper);
+	--bubble: var(--ink);
+	--bubble-ink: var(--paper);
 	/* What a dialog puts between itself and the page. Always darker than the
 	   page, which "ink at 34%" stops being the moment ink turns pale. */
 	--scrim: rgba(18, 22, 47, 0.34);
@@ -143,6 +145,8 @@
 	--glow-tint: #2b3160;
 	--cta: var(--accent);
 	--cta-ink: #12152c;
+	--bubble: #2b3157;
+	--bubble-ink: #eef0fc;
 	--scrim: rgba(3, 5, 14, 0.58);
 	--scrim-strong: rgba(3, 5, 14, 0.68);
 
@@ -183,6 +187,8 @@
 	--sky: rgba(214, 120, 164, 0.14);
 	--glow-tint: #3a1e2c;
 	--cta-ink: #1a0d14;
+	--bubble: #3a2029;
+	--bubble-ink: #fdeaf1;
 	--scrim: rgba(10, 4, 8, 0.6);
 	--scrim-strong: rgba(10, 4, 8, 0.7);
 	--logo-body: #f0cddc;

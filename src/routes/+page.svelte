@@ -26,7 +26,7 @@
 	import RobotStage from '$lib/components/RobotStage.svelte';
 	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 	import Transcript from '$lib/components/Transcript.svelte';
-	import VoiceButton from '$lib/components/VoiceButton.svelte';
+	import VoiceControls from '$lib/components/VoiceControls.svelte';
 	import { streamTurn } from '$lib/client/chat';
 	import { VoiceSession, type VoiceStatus } from '$lib/client/voice';
 	import { brain } from '$lib/state/brain.svelte';
@@ -51,6 +51,7 @@
 	let voiceActive = $state(false);
 	let audioLevel = $state(0);
 	let mouth = $state<MouthPose>(MOUTH_AT_REST);
+	let voiceMuted = $state(false);
 	let audible = $state(false);
 	let starting = $state(false);
 
@@ -204,10 +205,27 @@
 		document.documentElement.dataset.theme = session.theme;
 	});
 
+	/**
+	 * Stop her hearing the room, without hanging up.
+	 *
+	 * Muting only disables the outgoing track, so the connection, the tools and
+	 * everything already said stay exactly where they were — which is the point:
+	 * thinking out loud for a minute should not cost you the conversation.
+	 */
+	function toggleMute() {
+		voice.setMuted(!voice.muted);
+		voiceMuted = voice.muted;
+	}
+
+	function endVoice() {
+		voice.stop();
+		voiceActive = false;
+		voiceMuted = false;
+	}
+
 	async function toggleVoice() {
 		if (voice.active) {
-			voice.stop();
-			voiceActive = false;
+			endVoice();
 			return;
 		}
 		starting = true;
@@ -221,6 +239,7 @@
 				greet: conversation.isEmpty
 			});
 			voiceActive = voice.active;
+			voiceMuted = voice.muted;
 			stage?.beginResponse();
 		} catch {
 			// The session already reported it through onError.
@@ -454,20 +473,21 @@
 			</div>
 
 			<div class="controls">
-				<VoiceButton
+				<VoiceControls
 					status={voiceStatus}
 					active={voiceActive}
+					muted={voiceMuted}
 					level={audioLevel}
 					disabled={!unlocked || starting || !session.realtimeAvailable}
-					onclick={toggleVoice}
+					unavailable={!unlocked
+						? 'Add a key to begin'
+						: !session.realtimeAvailable
+							? 'Voice needs Realtime access on this key'
+							: undefined}
+					onstart={toggleVoice}
+					onend={endVoice}
+					onmute={toggleMute}
 				/>
-				{#if !unlocked}
-					<p class="status">Add a key to begin.</p>
-				{:else if !session.realtimeAvailable}
-					<p class="status">Voice needs Realtime access on this key.</p>
-				{:else if voiceActive}
-					<p class="status">Interrupting is fine.</p>
-				{/if}
 			</div>
 
 			{#if unlocked}
@@ -729,14 +749,6 @@
 		text-align: center;
 	}
 
-	.status {
-		margin: 0;
-		font-size: 12.5px;
-		line-height: 1.45;
-		color: var(--muted);
-		max-width: 32ch;
-	}
-
 	.deck {
 		border-top: 1px solid var(--line);
 		padding-top: 16px;
@@ -898,22 +910,12 @@
 		flex-direction: column;
 		min-height: 0;
 		/*
-		 * A rule that starts and ends nowhere.
+		 * No rule at all.
 		 *
-		 * A hard 1px line from the top of the viewport to the bottom cuts the
-		 * page in two and fights the single wash the background is trying to
-		 * be. Fading it out at both ends separates the columns without drawing
-		 * a border around anything.
+		 * A line down the page cuts it in two and fights the single wash the
+		 * background is trying to be. The gap between the columns is enough to
+		 * separate them.
 		 */
-		border-left: 1px solid transparent;
-		border-image: linear-gradient(
-				to bottom,
-				transparent,
-				var(--line) 12%,
-				var(--line) 88%,
-				transparent
-			)
-			1;
 		padding-left: clamp(16px, 1.6vw, 28px);
 	}
 
@@ -973,22 +975,12 @@
 			border-radius: 22px 0 0 22px;
 			border-top: 0;
 			/*
-		 * A rule that starts and ends nowhere.
+		 * No rule at all.
 		 *
-		 * A hard 1px line from the top of the viewport to the bottom cuts the
-		 * page in two and fights the single wash the background is trying to
-		 * be. Fading it out at both ends separates the columns without drawing
-		 * a border around anything.
+		 * A line down the page cuts it in two and fights the single wash the
+		 * background is trying to be. The gap between the columns is enough to
+		 * separate them.
 		 */
-		border-left: 1px solid transparent;
-		border-image: linear-gradient(
-				to bottom,
-				transparent,
-				var(--line) 12%,
-				var(--line) 88%,
-				transparent
-			)
-			1;
 		}
 
 		@keyframes slide {
@@ -1033,11 +1025,6 @@
 			justify-items: start;
 			text-align: left;
 			gap: 7px;
-		}
-
-		.status {
-			max-width: none;
-			font-size: 12px;
 		}
 
 		.deck {

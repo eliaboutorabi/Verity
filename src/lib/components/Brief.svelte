@@ -67,7 +67,7 @@
 			here, and you can take it away as a memo.
 		</p>
 	{:else}
-		<div class="scroll fade-edges">
+		<div class="scroll">
 			{#if brief.findings.length}
 				<ul class="findings">
 					{#each brief.findings as item (item.id)}
@@ -226,9 +226,14 @@
 		padding: 10px 10px 11px 11px;
 		border-radius: 13px;
 		background: var(--surface);
-		border: 1px solid var(--line);
-		border-left: 3px solid var(--severity-info);
-		box-shadow: var(--shadow-card);
+		/*
+		 * The severity is the whole outline, not a tab down one side.
+		 *
+		 * A coloured edge plus a drop shadow makes every card look like it is
+		 * peeling off the page to the left. A thin tinted border says the same
+		 * thing, quietly, all the way round.
+		 */
+		border: 1px solid color-mix(in srgb, var(--severity-info) 42%, transparent);
 		animation: rise 340ms var(--ease) both;
 		transition: opacity 200ms var(--ease);
 	}
@@ -241,13 +246,13 @@
 	}
 
 	.findings li[data-severity='high'] {
-		border-left-color: var(--severity-high);
+		border-color: color-mix(in srgb, var(--severity-high) 46%, transparent);
 	}
 	.findings li[data-severity='medium'] {
-		border-left-color: var(--severity-medium);
+		border-color: color-mix(in srgb, var(--severity-medium) 46%, transparent);
 	}
 	.findings li[data-severity='low'] {
-		border-left-color: var(--severity-low);
+		border-color: color-mix(in srgb, var(--severity-low) 46%, transparent);
 	}
 
 	.findings li.done {
@@ -343,8 +348,9 @@
 	}
 
 	.gaps li {
-		padding-left: 11px;
-		border-left: 2px solid var(--line);
+		padding: 9px 11px;
+		border: 1px solid var(--line);
+		border-radius: 11px;
 	}
 
 	.gaps .topic {

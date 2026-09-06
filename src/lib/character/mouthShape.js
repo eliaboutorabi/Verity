@@ -35,8 +35,8 @@ const DEPTH = 0.03;
 /** The widest the gap between the lips ever gets. */
 const MAX_APERTURE = 0.3;
 
-/** Samples along each lip, corner to corner. */
-const ALONG = 30;
+/** Samples along each lip, corner to corner. Enough that no facet shows. */
+const ALONG = 56;
 /** Samples across a lip's half-round section. */
 const ACROSS = 5;
 
@@ -62,19 +62,28 @@ export const MOUTH_SHAPE_REST = Object.freeze({
   smile: 1,
 });
 
-/**
- * How far the corners stay sealed, as a fraction of the half-width.
- *
- * The lips have to close over a visible distance. A profile that only reaches
- * zero at the very last sample — a parabola does — slams shut across one
- * segment, and what you see is two lips that came apart in the middle and were
- * pinched back together at the ends. Easing to zero over the outer half looks
- * like a mouth: sealed at the corners, full across the middle.
- */
-const SEAL = 0.5;
+/** How much of the half-width the corners spend closing. */
+const SEAL = 0.3;
 
 /**
- * The height of one lip line at `u`, where u runs -1 to 1 across the mouth.
+ * How far open the mouth is at `u`, where u runs -1 to 1 across it.
+ *
+ * An ellipse times a seal, because neither alone works. The ellipse gives the
+ * round, full middle that makes an open mouth look like a mouth; on its own it
+ * arrives at the corner with a vertical tangent, so the lips visibly come apart
+ * and get pinched back together over a single segment. A super-ellipse fixes
+ * the corner and turns the middle into a funnel. Multiplying the ellipse by a
+ * smoothstep that closes over the outer third keeps the roundness and lands the
+ * two lips into each other with matching slopes.
+ */
+function apertureAt(u) {
+  const ellipse = Math.sqrt(Math.max(0, 1 - u * u));
+  const t = Math.min(1, (1 - Math.abs(u)) / SEAL);
+  return ellipse * t * t * (3 - 2 * t);
+}
+
+/**
+ * The height of one lip line at `u`.
  *
  * `mid` is the smile itself: a parabola hung between the two corners. The lips
  * open away from it, and by unequal amounts — the jaw takes the lower lip down
@@ -82,9 +91,7 @@ const SEAL = 0.5;
  * mouth from looking like a surprised circle.
  */
 function lipHeight(u, mid, aperture, upper) {
-  const seal = Math.min(1, (1 - Math.abs(u)) / SEAL);
-  const bulge = seal * seal * (3 - 2 * seal);
-  return mid + (upper ? aperture * 0.34 : -aperture * 0.66) * bulge;
+  return mid + (upper ? aperture * 0.34 : -aperture * 0.66) * apertureAt(u);
 }
 
 /**
@@ -160,6 +167,8 @@ export function createVerityMouth(material) {
 
     // Squeezed lips read thicker; so does a pursed mouth, seen end-on.
     const stroke = STROKE * (1 + press * 0.34 + round * 0.12);
+    /** How far open she is, as a fraction of the widest she goes. */
+    const openness = aperture / MAX_APERTURE;
 
     for (let lip = 0; lip < 2; lip += 1) {
       const upper = lip === 0;
@@ -177,15 +186,8 @@ export function createVerityMouth(material) {
          * place they touch.
          */
         const taper = 0.5 + 0.5 * Math.pow(Math.max(0, 1 - u * u), 0.4);
-        /*
-         * The lower lip is the fuller of the two.
-         *
-         * True of most faces, and it also corrects for the light. The key comes
-         * from above, so the upper lip's outward face is lit and the lower
-         * lip's outward face turns away from it; matched thicknesses left her
-         * looking top-heavy, with the upper lip reading as the pronounced one.
-         */
-        const thickness = stroke * taper * (upper ? 1 : 1.2);
+        // The lower lip is the fuller of the two, which is true of most faces.
+        const thickness = stroke * taper * (upper ? 1 : 1.3);
 
         for (let j = 0; j < ACROSS; j += 1) {
           /*
@@ -201,11 +203,19 @@ export function createVerityMouth(material) {
           positions[offset] = x;
           positions[offset + 1] = y + (upper ? thickness * s : -thickness * s);
           /*
-           * Fullest at the opening, flat at the outer edge. Closed, the two
-           * halves reassemble into exactly the round tube this replaced; open,
-           * each lip keeps its fullness where a lip actually has it.
+           * Where the round of the stroke crests, across its width.
+           *
+           * Closed, both crest at the seam, and the two halves reassemble into
+           * exactly the round tube this replaced. As she opens, the lower lip's
+           * crest travels outward. That is not decoration: with both cresting
+           * at the seam, the upper lip's outer face tilts up into the key light
+           * and the lower lip's tilts away from it, and no amount of extra
+           * thickness fixed the upper lip reading as the pronounced one. Moving
+           * the crest turns the lower lip's surface back toward the light.
            */
-          positions[offset + 2] = DEPTH * Math.sqrt(Math.max(0, 1 - s * s));
+          const crest = upper ? 0 : 0.55 * openness;
+          const across = (s - crest) / Math.max(crest, 1 - crest);
+          positions[offset + 2] = DEPTH * Math.sqrt(Math.max(0, 1 - across * across));
         }
       }
     }
@@ -217,5 +227,15 @@ export function createVerityMouth(material) {
 
   setShape(MOUTH_SHAPE_REST);
 
-  return { object3d: mesh, setShape };
+  return {
+    object3d: mesh,
+    setShape,
+    /*
+     * How the vertices are laid out: two lips of `along` columns, each column
+     * `across` samples running from the lip line outward. Published because
+     * anything measuring this mesh has to know it, and a test that keeps its
+     * own copy of the numbers drifts the moment the sampling changes.
+     */
+    layout: { along: ALONG, across: ACROSS },
+  };
 }

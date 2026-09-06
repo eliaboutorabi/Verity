@@ -122,8 +122,13 @@
 	.bubble {
 		margin: 0;
 		max-width: min(46ch, 88%);
-		background: var(--ink);
-		color: var(--paper);
+		/*
+		 * Ink on paper in the light; a raised surface in the dark. Inverting it
+		 * puts a small white slab in the middle of a dark page, which is the
+		 * brightest thing on screen for the least important line in the thread.
+		 */
+		background: var(--bubble);
+		color: var(--bubble-ink);
 		padding: 10px 15px;
 		border-radius: 18px 18px 5px 18px;
 		font-size: 14.5px;

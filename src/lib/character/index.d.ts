@@ -180,4 +180,6 @@ export const MOUTH_SHAPE_REST: Readonly<VerityMouthShape>;
 export function createVerityMouth(material: Material): {
 	object3d: Mesh;
 	setShape(shape: Partial<VerityMouthShape>): void;
+	/** Two lips of `along` columns; each column `across` samples, seam outward. */
+	layout: { along: number; across: number };
 };

@@ -27,4 +27,4 @@ export function isCharacterId(value: unknown): value is CharacterId {
 }
 
 /** The realtime model the voice session runs on. */
-export const REALTIME_MODEL = 'gpt-realtime-2';
+export const REALTIME_MODEL = 'gpt-realtime-2.1';

@@ -427,10 +427,10 @@
 	}
 
 	.findings li {
-		padding: 10px 12px 10px 13px;
+		padding: 10px 12px;
 		border-radius: 12px;
 		background: var(--paper);
-		border-left: 3px solid var(--severity-info);
+		border: 1px solid color-mix(in srgb, var(--severity-info) 42%, transparent);
 	}
 
 	a {
@@ -548,13 +548,13 @@
 	}
 
 	.findings li[data-severity='high'] {
-		border-left-color: var(--severity-high);
+		border-color: color-mix(in srgb, var(--severity-high) 46%, transparent);
 	}
 	.findings li[data-severity='medium'] {
-		border-left-color: var(--severity-medium);
+		border-color: color-mix(in srgb, var(--severity-medium) 46%, transparent);
 	}
 	.findings li[data-severity='low'] {
-		border-left-color: var(--severity-low);
+		border-color: color-mix(in srgb, var(--severity-low) 46%, transparent);
 	}
 
 	.finding-head {
@@ -602,7 +602,6 @@
 
 	.marks li {
 		padding: 0;
-		border-left: 0;
 	}
 
 	.marks button {
@@ -611,8 +610,7 @@
 		gap: 10px;
 		width: 100%;
 		text-align: left;
-		border: 1px solid var(--line);
-		border-left: 3px solid var(--severity-info);
+		border: 1px solid color-mix(in srgb, var(--severity-info) 42%, transparent);
 		border-radius: 10px;
 		background: var(--paper);
 		padding: 8px 11px;
@@ -629,13 +627,13 @@
 	}
 
 	.marks li[data-severity='high'] button {
-		border-left-color: var(--severity-high);
+		border-color: color-mix(in srgb, var(--severity-high) 46%, transparent);
 	}
 	.marks li[data-severity='medium'] button {
-		border-left-color: var(--severity-medium);
+		border-color: color-mix(in srgb, var(--severity-medium) 46%, transparent);
 	}
 	.marks li[data-severity='low'] button {
-		border-left-color: var(--severity-low);
+		border-color: color-mix(in srgb, var(--severity-low) 46%, transparent);
 	}
 
 	.mark-note {
@@ -664,17 +662,17 @@
 		padding: 9px 11px;
 		border-radius: 11px;
 		background: var(--paper);
-		border-left: 3px solid var(--severity-info);
+		border: 1px solid color-mix(in srgb, var(--severity-info) 42%, transparent);
 		font-size: 13px;
 		line-height: 1.5;
 		color: var(--ink-soft);
 	}
 
 	.brief-echo li[data-severity='high'] {
-		border-left-color: var(--severity-high);
+		border-color: color-mix(in srgb, var(--severity-high) 46%, transparent);
 	}
 	.brief-echo li[data-severity='medium'] {
-		border-left-color: var(--severity-medium);
+		border-color: color-mix(in srgb, var(--severity-medium) 46%, transparent);
 	}
 
 	.brief-echo strong {
