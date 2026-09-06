@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { createVerityMouth } from "./mouthShape.js";
 
 export const VERITY_MODES = Object.freeze({
   IDLE: "idle",
@@ -242,9 +243,33 @@ export class VerityRobot {
 
     this.mode = "idle";
     this.audioLevel = 0;
+    /**
+     * What her lips are asked to do, and what they are currently doing.
+     *
+     * Two copies because the second chases the first. Whoever is driving the
+     * mouth has already smoothed it for their own reasons — the voice analyser
+     * damps each channel at a different rate — but poses arrive on somebody
+     * else's schedule, and a frame that misses one should carry on rather than
+     * freeze. Chasing at a high rate is nearly transparent when poses are
+     * arriving and covers for it when they are not.
+     */
+    this.mouthTarget = { open: 0, round: 0, press: 0, hiss: 0, energy: 0 };
+    this.mouthCurrent = { open: 0, round: 0, press: 0, hiss: 0, energy: 0 };
+    /** Seconds since the last pose arrived, so a silent driver is noticed. */
+    this.mouthPoseAge = Infinity;
     this.outputAudioActive = false;
     this.transcript = "";
     this.printedTranscript = "";
+    /**
+     * The characters the print head put down this frame.
+     *
+     * The paper prints at its own pace — a couple of dozen characters a
+     * second, which is roughly a speaking rate — while deltas arrive from the
+     * network in whatever sized lumps the model felt like. This is the paced
+     * stream, and it is what a mouth should be driven from: the letter under
+     * the head is the letter she is saying.
+     */
+    this.justPrinted = "";
     this.pendingReceiptText = "";
     this.printCharacterBudget = 0;
     this.receiptLines = [];
@@ -420,16 +445,9 @@ export class VerityRobot {
       return eye;
     });
 
-    const smileCurve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(-0.2, 0.03, 0),
-      new THREE.Vector3(0, -0.17, 0),
-      new THREE.Vector3(0.2, 0.03, 0),
-    );
-    this.mouth = new THREE.Mesh(
-      new THREE.TubeGeometry(smileCurve, 20, 0.035, 8, false),
-      this.mouthMaterial,
-    );
-    this.mouth.position.set(0, 1.08, 1.105);
+    this.mouthShape = createVerityMouth(this.mouthMaterial);
+    this.mouth = this.mouthShape.object3d;
+    this.mouth.position.set(0, 1.08, 1.09);
     this.mouth.renderOrder = 4;
     this.floatGroup.add(this.mouth);
 
@@ -820,6 +838,24 @@ export class VerityRobot {
   }
 
   /**
+   * Tell her mouth what shape to be in.
+   *
+   * `open`, `round`, `press` and `hiss` are each 0..1 and compose freely; see
+   * mouthShape.js for what each does. Call it every frame while she is
+   * speaking. Stop calling it and she returns to her resting smile on her own,
+   * so nothing has to remember to switch her off.
+   */
+  setMouthPose(pose) {
+    const clamp = (value) => THREE.MathUtils.clamp(value ?? 0, 0, 1);
+    this.mouthTarget.open = clamp(pose?.open);
+    this.mouthTarget.round = clamp(pose?.round);
+    this.mouthTarget.press = clamp(pose?.press);
+    this.mouthTarget.hiss = clamp(pose?.hiss);
+    this.mouthTarget.energy = clamp(pose?.energy);
+    this.mouthPoseAge = 0;
+  }
+
+  /**
    * Press one of her keys.
    *
    * `index` is the keypad in reading order: +, −, ×, =. The key travels and
@@ -1067,6 +1103,7 @@ export class VerityRobot {
   }
 
   update(time, deltaTime) {
+    this.justPrinted = "";
     const motionScale = this.reducedMotion ? 0.18 : 1;
     const speakingEnergy = this.mode === "speaking" ? 0.34 : 0;
     const listeningEnergy = this.mode === "listening" ? 0.12 : 0;
@@ -1128,24 +1165,44 @@ export class VerityRobot {
     const breath = 1 + Math.sin(time * 1.15) * 0.004 * motionScale;
     this.body.scale.set(breath, breath, breath);
 
-    const isVoicing = this.audioLevel > 0.025;
-    // Delight deepens the smile arc and widens it; concern flattens it.
-    const mouthMotion = 1 + this.audioLevel * 1.36 + delight * 0.5 - concern * 0.32;
-    this.mouth.scale.y = THREE.MathUtils.damp(
-      this.mouth.scale.y,
-      mouthMotion,
-      isVoicing ? 26 : 16,
-      deltaTime,
-    );
-    this.mouth.scale.x = THREE.MathUtils.damp(
-      this.mouth.scale.x,
-      1 - this.audioLevel * 0.115 + delight * 0.22,
-      22,
-      deltaTime,
-    );
+    /*
+     * The mouth.
+     *
+     * Whoever is driving it hands over a pose; if nobody has for a moment, the
+     * level alone stands in, which keeps the character usable on its own and
+     * covers the gap between a driver stopping and her settling. The fallback
+     * is deliberately the old behaviour — aperture from loudness and nothing
+     * else — so it degrades to what was here before rather than to a freeze.
+     */
+    this.mouthPoseAge += deltaTime;
+    if (this.mouthPoseAge > 0.35) {
+      this.mouthTarget.open = Math.min(1, this.audioLevel * 1.15);
+      this.mouthTarget.round = 0;
+      this.mouthTarget.press = 0;
+      this.mouthTarget.hiss = 0;
+      this.mouthTarget.energy = Math.min(1, this.audioLevel * 1.6);
+    }
+
+    for (const channel of ["open", "round", "press", "hiss", "energy"]) {
+      this.mouthCurrent[channel] = THREE.MathUtils.damp(
+        this.mouthCurrent[channel],
+        this.mouthTarget[channel] * motionScale,
+        34,
+        deltaTime,
+      );
+    }
+
+    // Delight is a wider grin, concern a flatter one. The shape composes them
+    // with whatever her lips are doing rather than overriding it.
+    this.mouthShape.setShape({
+      ...this.mouthCurrent,
+      smile: THREE.MathUtils.clamp(1 + delight * 0.42 - concern * 0.66, 0, 1.5),
+    });
+
+    // Her jaw takes the whole mouth down a little as it opens.
     this.mouth.position.y = THREE.MathUtils.damp(
       this.mouth.position.y,
-      1.08 - this.audioLevel * 0.052,
+      1.08 - this.mouthCurrent.open * 0.036,
       22,
       deltaTime,
     );
@@ -1263,7 +1320,8 @@ export class VerityRobot {
         this.pendingReceiptText.length,
       );
       if (printableCharacters > 0) {
-        this.printReceiptText(this.pendingReceiptText.slice(0, printableCharacters));
+        this.justPrinted = this.pendingReceiptText.slice(0, printableCharacters);
+        this.printReceiptText(this.justPrinted);
         this.pendingReceiptText = this.pendingReceiptText.slice(printableCharacters);
         this.printCharacterBudget -= printableCharacters;
       }

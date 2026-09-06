@@ -16,6 +16,8 @@
 	} from '$lib/character/index.js';
 	import { CHARACTERS, type CharacterId } from '$lib/voices';
 	import { printerEnvelope } from './printer-envelope.js';
+	import { MOUTH_AT_REST, type MouthPose } from '$lib/client/lipsync';
+	import { TextMouth } from '$lib/client/mouth-from-text';
 	import { playKey } from '$lib/client/keysound';
 	import { attachKeyPresses, gazeAtElement, registerCamera } from '$lib/client/robot-interaction';
 
@@ -24,6 +26,11 @@
 		mode: 'idle' | 'listening' | 'thinking' | 'speaking';
 		audioLevel?: number;
 		audible?: boolean;
+		/**
+		 * The shape her lips should be in, from whoever is driving the voice.
+		 * Absent in text mode, where the printed answer drives them instead.
+		 */
+		mouth?: MouthPose;
 		/**
 		 * Text mode has no waveform, but the receipt only advances while output
 		 * is audible. Setting this synthesises a printer-like envelope so a typed
@@ -39,6 +46,7 @@
 		mode,
 		audioLevel = 0,
 		audible = false,
+		mouth = MOUTH_AT_REST,
 		printing = false,
 		onkeypress
 	}: Props = $props();
@@ -63,7 +71,17 @@
 	 * one obvious place where the current frame's inputs come from, instead of
 	 * relying on how prop access behaves inside a captured callback.
 	 */
-	const inputs = { level: 0, audible: false, printing: false };
+	const inputs = { level: 0, audible: false, printing: false, mouth: MOUTH_AT_REST };
+
+	/**
+	 * Her mouth while she is typing.
+	 *
+	 * Text mode is the one case where the words and the clock are both ours, so
+	 * her lips can be driven from the letters going onto the receipt rather than
+	 * from a synthesised wobble. It reads the same buffer the paper does, so
+	 * what her mouth is doing and what the paper says are the same thing.
+	 */
+	const typing = new TextMouth();
 
 	/**
 	 * How the camera is placed.
@@ -123,6 +141,7 @@
 		inputs.level = audioLevel;
 		inputs.audible = audible;
 		inputs.printing = printing;
+		inputs.mouth = mouth;
 	});
 
 	/** Buffered while the scene boots, so no transcript text is dropped. */
@@ -139,6 +158,7 @@
 
 	export function clearTranscript(): void {
 		queued.length = 0;
+		typing.reset();
 		robot?.clearTranscript();
 	}
 
@@ -172,6 +192,7 @@
 		return {
 			...robot.getState(),
 			inputs: { ...inputs },
+			mouth: { ...robot.mouthCurrent },
 			outputAudioActive: (robot as unknown as { outputAudioActive: boolean }).outputAudioActive,
 			// Where she and her shadow land in the frame, in normalised device
 			// coordinates: -1 is the bottom edge, 1 the top. The one number that
@@ -247,9 +268,14 @@
 				if (inputs.printing) {
 					robot.setAudioLevel(printerEnvelope(now / 1000));
 					robot.setOutputAudioActive(true);
+					// `justPrinted` is a frame behind, since `update` writes it. At
+					// sixteen milliseconds that is nothing, and reading it here keeps
+					// her mouth on the paper's clock rather than the network's.
+					robot.setMouthPose(typing.push(robot.justPrinted, delta));
 				} else {
 					robot.setAudioLevel(inputs.level);
 					robot.setOutputAudioActive(inputs.audible);
+					robot.setMouthPose(inputs.mouth);
 				}
 				robot.update(now / 1000, delta);
 				shadow?.follow(robot);

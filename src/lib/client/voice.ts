@@ -16,6 +16,7 @@ import type { ToolCallView, ToolResult, ToolResultView } from '$lib/harness';
 import { spokenCorrection } from '$lib/plugins/verify';
 import type { StoredDocument } from '$lib/plugins';
 import type { CharacterId } from '$lib/voices';
+import { MOUTH_AT_REST, VoiceMouth, type MouthPose } from './lipsync';
 
 export type VoiceStatus =
 	| 'idle'
@@ -45,7 +46,7 @@ export interface VoiceHandlers {
 	 */
 	onReview?(status: 'clean' | 'revising', reasons: string[]): void;
 	/** Called every animation frame with the output envelope, 0–1. */
-	onAudioLevel(level: number, audible: boolean): void;
+	onAudioLevel(level: number, audible: boolean, mouth: MouthPose): void;
 	/**
 	 * The conversation so far, asked for at connect time.
 	 *
@@ -86,8 +87,7 @@ export class VoiceSession {
 	#stream: MediaStream | null = null;
 	#audio: HTMLAudioElement | null = null;
 	#context: AudioContext | null = null;
-	#analyser: AnalyserNode | null = null;
-	#buffer: Uint8Array<ArrayBuffer> | null = null;
+	#mouth: VoiceMouth | null = null;
 	#frame = 0;
 	#envelope = 0;
 	#lastAudibleAt = -Infinity;
@@ -280,8 +280,8 @@ export class VoiceSession {
 		this.#pc = null;
 		this.#stream = null;
 		this.#context = null;
-		this.#analyser = null;
-		this.#buffer = null;
+		this.#mouth?.disconnect();
+		this.#mouth = null;
 		this.#envelope = 0;
 		this.#lastAudibleAt = -Infinity;
 		this.#pending.clear();
@@ -290,7 +290,7 @@ export class VoiceSession {
 		this.#responseClosed = true;
 		this.#owedResponse = false;
 		this.#resetTurn();
-		this.handlers.onAudioLevel(0, false);
+		this.handlers.onAudioLevel(0, false, MOUTH_AT_REST);
 	}
 
 	stop(): void {
@@ -402,20 +402,21 @@ export class VoiceSession {
 		this.#context ??= new AudioContext();
 		void this.#context.resume().catch(() => {});
 
-		const analyser = this.#context.createAnalyser();
-		analyser.fftSize = 512;
-		analyser.smoothingTimeConstant = 0.82;
-		this.#context.createMediaStreamSource(stream).connect(analyser);
-		this.#analyser = analyser;
-		this.#buffer = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+		this.#mouth?.disconnect();
+		this.#mouth = new VoiceMouth(this.#context, this.#context.createMediaStreamSource(stream));
 
 		this.#startMeter();
 	}
 
 	/**
-	 * Drive the robot's mouth from the waveform we are actually hearing, not
-	 * from whether a response object exists — the tail of an utterance still
-	 * has to move the jaw and feed the receipt.
+	 * Drive the robot's mouth from the sound we are actually hearing, not from
+	 * whether a response object exists — the tail of an utterance still has to
+	 * move the lips and feed the receipt.
+	 *
+	 * Two things come out of the same frame and they are not the same thing.
+	 * The pose is the shape of her mouth, worked out from where the energy sits
+	 * in the spectrum. The envelope is plain loudness, which is what the paper
+	 * feed and the "is she audible" gate want and all they want.
 	 */
 	#startMeter(): void {
 		let previous = performance.now();
@@ -425,17 +426,10 @@ export class VoiceSession {
 			const delta = Math.min((now - previous) / 1000, 0.05);
 			previous = now;
 
-			const analyser = this.#analyser;
-			const buffer = this.#buffer;
-			if (!analyser || !buffer) return;
+			const mouth = this.#mouth;
+			if (!mouth) return;
 
-			analyser.getByteTimeDomainData(buffer);
-			let sum = 0;
-			for (const sample of buffer) {
-				const centred = (sample - 128) / 128;
-				sum += centred * centred;
-			}
-			const rms = Math.sqrt(sum / buffer.length);
+			const { pose, level: rms } = mouth.read(delta);
 			const normalised = clamp((rms - 0.018) / 0.14, 0, 1);
 			const target = normalised < 0.018 ? 0 : smoothstep(normalised);
 
@@ -446,7 +440,7 @@ export class VoiceSession {
 
 			if (rms > 0.0015) this.#lastAudibleAt = now / 1000;
 			const audible = now / 1000 - this.#lastAudibleAt < 0.22;
-			this.handlers.onAudioLevel(this.#envelope, audible);
+			this.handlers.onAudioLevel(this.#envelope, audible, pose);
 		};
 
 		cancelAnimationFrame(this.#frame);

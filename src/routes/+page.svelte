@@ -8,6 +8,7 @@
 	 * which transport carries the turn.
 	 */
 	import { onMount, tick } from 'svelte';
+	import { MOUTH_AT_REST, type MouthPose } from '$lib/client/lipsync';
 	import {
 		ClipboardIcon,
 		Comment01Icon,
@@ -49,6 +50,7 @@
 	let voiceStatus = $state<VoiceStatus>('idle');
 	let voiceActive = $state(false);
 	let audioLevel = $state(0);
+	let mouth = $state<MouthPose>(MOUTH_AT_REST);
 	let audible = $state(false);
 	let starting = $state(false);
 
@@ -105,9 +107,10 @@
 			if (status === 'clean') conversation.markChecked();
 			else conversation.markVoiceRevision(reasons);
 		},
-		onAudioLevel: (level, isAudible) => {
+		onAudioLevel: (level, isAudible, pose) => {
 			audioLevel = level;
 			audible = isAudible;
+			mouth = pose;
 		}
 	});
 
@@ -165,6 +168,9 @@
 			// onMount only, because this module is also rendered on the server.
 			(window as unknown as Record<string, unknown>).__verity = {
 				robot: () => stage?.debugState(),
+				// Poses her mouth by hand, which is the only way to look at one
+				// shape for long enough to judge it.
+				setMouth: (pose: Partial<MouthPose>) => (mouth = { ...MOUTH_AT_REST, ...pose }),
 				voice: () => ({ status: voiceStatus, active: voiceActive, level: audioLevel, audible })
 			};
 		}
@@ -439,6 +445,7 @@
 					character={session.character}
 					mode={robotMode}
 					{audioLevel}
+					{mouth}
 					{audible}
 					printing={textStreaming}
 					onkeypress={onKeyPress}
