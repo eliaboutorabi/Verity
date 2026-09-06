@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolRegistry } from '$lib/harness';
+import type { PackId } from '$lib/packs';
 import { createHarness } from './index.js';
 
 async function names(
-	packs?: readonly ('ecfr' | 'federal-register' | 'review' | 'critic' | 'brief' | 'study')[]
+	packs?: readonly PackId[]
 ) {
 	const ctx = await createHarness({ packs });
 	const list = ctx.require<ToolRegistry>('tools').names().sort();
@@ -15,6 +16,7 @@ describe('tool packs', () => {
 	it('mounts everything by default, including markup', async () => {
 		expect(await names()).toEqual([
 			'ask_question',
+			'draw_interview_question',
 			'find_rule_changes',
 			'highlight_document',
 			'list_documents',
@@ -52,6 +54,11 @@ describe('tool packs', () => {
 		expect(list).not.toContain('teach_concept');
 		expect(list).not.toContain('reveal');
 		expect(list).not.toContain('score_answer');
+	});
+
+	it('withholds the interview bank, which is off until it is asked for', async () => {
+		expect(await names(['ecfr', 'study'])).not.toContain('draw_interview_question');
+		expect(await names(['ecfr', 'interview'])).toContain('draw_interview_question');
 	});
 
 	it('always keeps the CFR, whatever is asked for', async () => {

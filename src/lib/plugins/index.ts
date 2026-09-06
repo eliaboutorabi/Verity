@@ -26,7 +26,8 @@ import { verifyPlugin } from './verify.js';
 import { criticPlugin } from './critic.js';
 import { briefPlugin } from './brief.js';
 import { PACK_IDS, type PackId } from '$lib/packs';
-import { studyPlugin } from './study.js';
+import { openQuestionGuard, studyPlugin } from './study.js';
+import { interviewPlugin } from './interview.js';
 
 /** The plugins a caller can mount: tool packs, plus the optional critic. */
 export { PACK_IDS, type PackId } from '$lib/packs';
@@ -64,6 +65,10 @@ export interface HarnessOptions {
 	 * requests, so without them the loop guard starts every call with no memory.
 	 */
 	priorCalls?: readonly PriorCall[];
+	/** Interview questions already put to this candidate, so none repeats. */
+	askedQuestions?: readonly string[];
+	/** A question from an earlier turn is on screen and has not been marked. */
+	openQuestion?: boolean;
 }
 
 /**
@@ -84,11 +89,25 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Conte
 	// The CFR is the whole point; a caller cannot leave the app with no way to
 	// look anything up.
 	packs.add('ecfr');
+	// The interview bank draws questions; the study pack is what reveals and
+	// marks them. A question you cannot mark is not an interview, so asking for
+	// one without the other is always a mistake rather than a choice.
+	if (packs.has('interview')) packs.add('study');
 
 	if (packs.has('ecfr')) await ctx.plugin(ecfrPlugin);
 	if (packs.has('federal-register')) await ctx.plugin(federalRegisterPlugin);
 	if (packs.has('brief')) await ctx.plugin(briefPlugin);
 	if (packs.has('study')) await ctx.plugin(studyPlugin);
+	// Seeded with what has already been drawn, for the same reason the loop
+	// guard is: a voice turn arrives as its own stateless request, so without
+	// this every question would be drawn from a bank with no memory.
+	if (packs.has('interview')) {
+		await ctx.plugin(interviewPlugin(options.askedQuestions ?? []));
+	}
+	// Both packs put questions on the same screen, and there is only one screen.
+	if (packs.has('study') || packs.has('interview')) {
+		await ctx.plugin(openQuestionGuard(options.openQuestion ?? false));
+	}
 	if (packs.has('review')) {
 		await ctx.plugin(reviewPlugin);
 		await ctx.plugin(highlightPlugin);
@@ -121,3 +140,4 @@ export { MAX_DOCUMENT_CHARS, type DocumentStore, type StoredDocument } from './d
 export { REVIEW_RULES, scanDocument, type ReviewRule, type Severity } from './review-rules.js';
 export type { PriorCall } from './loop-guard.js';
 export { EXAM_AREAS } from './study.js';
+export { INTERVIEW_TOPICS } from './interview.js';

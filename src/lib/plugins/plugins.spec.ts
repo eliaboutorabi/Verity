@@ -101,6 +101,7 @@ describe('harness assembly', () => {
 
 		expect(names).toEqual([
 			'ask_question',
+			'draw_interview_question',
 			'find_rule_changes',
 			'highlight_document',
 			'list_documents',

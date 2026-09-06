@@ -30,6 +30,22 @@ class StudyState {
 	readonly current = $derived(this.asked.at(-1));
 	readonly isEmpty = $derived(this.asked.length === 0);
 
+	/**
+	 * The bank entries already put to this candidate.
+	 *
+	 * Sent with every request so the next draw avoids them. The model cannot
+	 * hold this for us — a voice call arrives as its own stateless request — and
+	 * a repeated interview question is the one thing an interview must not do.
+	 */
+	readonly drawn = $derived(
+		this.asked.map((question) => question.slug).filter((slug): slug is string => !!slug)
+	);
+
+	/** A question is up and has not been marked. */
+	readonly hasOpenQuestion = $derived(
+		this.current !== undefined && this.current.verdict === undefined
+	);
+
 	/** Only marked questions count; the open one is not a miss yet. */
 	readonly marked = $derived(this.asked.filter((question) => question.verdict !== undefined));
 	readonly correct = $derived(this.marked.filter((q) => q.verdict === 'correct').length);

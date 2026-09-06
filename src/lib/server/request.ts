@@ -59,6 +59,20 @@ export interface BrainPayload {
 
 const MAX_SKILLS = 24;
 
+/**
+ * Interview questions already put to this candidate.
+ *
+ * Slugs from the bank, so the next draw can avoid them. Bounded and sanitised
+ * like everything else that arrives from a browser.
+ */
+export function parseAskedQuestions(raw: unknown): string[] {
+	if (!Array.isArray(raw)) return [];
+	return raw
+		.filter((slug): slug is string => typeof slug === 'string')
+		.map((slug) => slug.slice(0, 80))
+		.slice(-200);
+}
+
 /** Validate the knowledge and skills a client sent with its turn. */
 export function parseBrain(raw: unknown): BrainPayload {
 	const empty: BrainPayload = { knowledge: '', skills: [], packs: [...PACK_IDS] };

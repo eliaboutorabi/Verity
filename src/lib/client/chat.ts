@@ -10,6 +10,10 @@ export interface ChatTurn {
 	documents: StoredDocument[];
 	/** Knowledge, skills and the tool packs those skills need. */
 	brain?: unknown;
+	/** Interview questions already drawn, so the next one is a new one. */
+	askedQuestions?: readonly string[];
+	/** A question is on screen and unmarked, so another may not be asked. */
+	openQuestion?: boolean;
 	signal?: AbortSignal;
 }
 
@@ -23,7 +27,9 @@ export async function* streamTurn(turn: ChatTurn): AsyncGenerator<AgentEvent> {
 			messages: turn.messages,
 			documents: turn.documents,
 			model: turn.model,
-			brain: turn.brain
+			brain: turn.brain,
+			askedQuestions: turn.askedQuestions,
+			openQuestion: turn.openQuestion
 		})
 	});
 

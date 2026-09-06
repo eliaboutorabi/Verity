@@ -105,6 +105,8 @@
 		// Asked for at connect time, including after a reconnect, so a dropped
 		// session comes back knowing everything said before it dropped.
 		transcript: () => conversation.toMessages(),
+		askedQuestions: () => study.drawn,
+		openQuestion: () => study.hasOpenQuestion,
 		onReview: (status, reasons) => {
 			// A listener is not looking at the screen, so the correction is spoken.
 			// The badge is for whoever is.
@@ -312,6 +314,8 @@
 				messages,
 				documents: documents.payload(),
 				brain: brain.payload(),
+				askedQuestions: study.drawn,
+				openQuestion: study.hasOpenQuestion,
 				signal: abort.signal
 			})) {
 				conversation.applyAgentEvent(event);

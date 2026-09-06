@@ -14,8 +14,15 @@
 import type { Context } from '$lib/harness';
 import type { JsonValue } from '$lib/harness';
 
-/** Repeats of these are harmless — they are cheap and locally computed. */
-const EXEMPT = new Set(['list_documents']);
+/**
+ * Repeats of these are harmless.
+ *
+ * `list_documents` is cheap and locally computed. Drawing an interview question
+ * is *meant* to be called again with the same arguments — "another foundational
+ * one" is the same call — and the bank does its own dedupe, so guarding it
+ * would deny the second question of every interview.
+ */
+const EXEMPT = new Set(['list_documents', 'draw_interview_question']);
 
 export function fingerprint(name: string, args: Record<string, JsonValue>): string {
 	const normalised = Object.entries(args)

@@ -9,7 +9,7 @@ import { error, type RequestHandler } from '@sveltejs/kit';
 import { DEFAULT_MODEL, type AgentService, type ChatMessage } from '$lib/harness';
 import { createHarness } from '$lib/plugins';
 import { composeInstructions, TEXT_INSTRUCTIONS } from '$lib/prompts';
-import { describeError, parseBrain, parseDocuments, requireApiKey } from '$lib/server/request';
+import { describeError, parseAskedQuestions, parseBrain, parseDocuments, requireApiKey } from '$lib/server/request';
 
 export const config = { runtime: 'nodejs22.x' };
 
@@ -42,6 +42,8 @@ export const POST: RequestHandler = async ({ request }) => {
 	const ctx = await createHarness({
 		documents,
 		packs: brain.packs,
+		askedQuestions: parseAskedQuestions(body.askedQuestions),
+		openQuestion: body.openQuestion === true,
 		// Only for the duration of this request: the critic makes its own call.
 		credentials: { apiKey, model }
 	});

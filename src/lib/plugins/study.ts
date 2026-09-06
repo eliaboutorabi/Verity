@@ -52,6 +52,55 @@ function nextQuestionId(): string {
 	return `q${counter}`;
 }
 
+/**
+ * One question open at a time, enforced rather than requested.
+ *
+ * Asked politely in three places — the prompt, both tool descriptions, and the
+ * result text of the marking tool — she still, reliably, drew a second question
+ * in the same turn as the answer to the first. And the failure is not cosmetic:
+ * the mark lands on whichever question is newest, so the candidate's answer to
+ * the first gets graded against the second, and the feedback discusses a
+ * question nobody was asked.
+ *
+ * A rule that can be enforced should not be a request. This is a plain
+ * pre-execute guard: while a question is unmarked, asking another is refused
+ * with the reason and the way out.
+ *
+ * It has to know about `draw_interview_question`, which belongs to another
+ * pack, because both put a question on the same screen and there is only one
+ * screen. Naming it here is the smaller wrong than letting either pack overrun
+ * the other.
+ */
+const ASKING = new Set(['ask_question', 'draw_interview_question']);
+
+export function openQuestionGuard(openAtStart = false) {
+	return {
+		name: 'open-question-guard',
+		inject: ['tools'] as const,
+
+		apply(ctx: Context) {
+			// Seeded by the browser, which is the only thing that knows a question
+			// from a previous turn is still sitting there unanswered.
+			let open = openAtStart;
+
+			return ctx.on('tools/pre-execute', ({ name }: { name: string }) => {
+				if (name === 'score_answer') {
+					open = false;
+					return undefined;
+				}
+				if (!ASKING.has(name)) return undefined;
+				if (!open) {
+					open = true;
+					return undefined;
+				}
+				return {
+					deny: 'there is already a question on screen that you have not marked. Call score_answer on it first, so the mark lands on the question they actually answered. If they are skipping it, mark it incorrect and say so before you ask another.'
+				};
+			});
+		}
+	};
+}
+
 export const studyPlugin = {
 	name: 'study',
 	inject: ['tools'] as const,
@@ -184,6 +233,7 @@ export const studyPlugin = {
 					'Put one exam-style question on the screen and wait for an answer.',
 					'You write the hints and the answer here, at the same time as the question. They are held back by the screen and are not shown until the user asks for them, so writing them now costs nothing and means a hint is ready the moment it is wanted.',
 					'Ground the question in a provision you have actually read. A question whose answer you cannot cite is a question you cannot mark.',
+					'Only one question may be open at a time. Never ask a new one while a question you have already asked is unmarked — mark that one with score_answer first, or the mark lands on the wrong question.',
 					'Ask one. Then stop and wait — do not follow it with a second question, a hint, or the answer.'
 				].join(' '),
 				parameters: {
@@ -400,7 +450,7 @@ export const studyPlugin = {
 							text: [
 								`Marked ${value.verdict}. The score is on screen.`,
 								'Now say the feedback and stop.',
-								'Do not call ask_question again in this turn — ask whether they want another one and let them say so.',
+								'Do not ask another question in this turn — neither ask_question nor draw_interview_question. Ask whether they want another and let them say so.',
 								'Someone who has just got one wrong may want to talk about it, and firing the next question at them takes that away.'
 							].join(' ')
 						}

@@ -97,6 +97,14 @@ export type ExamQuestion = {
 	hints: string[];
 	answer: string;
 	citation?: string;
+	/**
+	 * Which entry of the interview bank this came from, when it came from one.
+	 *
+	 * Never rendered. It travels back to the server with the next request so a
+	 * question is not put twice — which the model cannot be relied on to
+	 * remember, since a voice call arrives as its own stateless request.
+	 */
+	slug?: string;
 };
 
 /** One numbered point in an explanation. */

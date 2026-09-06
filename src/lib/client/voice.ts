@@ -48,6 +48,15 @@ export interface VoiceHandlers {
 	/** Called every animation frame with the output envelope, 0–1. */
 	onAudioLevel(level: number, audible: boolean, mouth: MouthPose): void;
 	/**
+	 * Interview questions already drawn, asked for at call time.
+	 *
+	 * The browser holds the session, so the browser holds this — the same
+	 * reason it supplies the loop guard's history.
+	 */
+	askedQuestions?(): readonly string[];
+	/** Whether a question is on screen and still unmarked. */
+	openQuestion?(): boolean;
+	/**
 	 * The conversation so far, asked for at connect time.
 	 *
 	 * A callback rather than a start option because a reconnect happens in the
@@ -580,7 +589,9 @@ export class VoiceSession {
 					arguments: parsed,
 					documents: this.#documents,
 					brain: this.#brain,
-					priorCalls
+					priorCalls,
+					askedQuestions: this.handlers.askedQuestions?.() ?? [],
+					openQuestion: this.handlers.openQuestion?.() ?? false
 				})
 			});
 			const payload = (await response.json()) as {

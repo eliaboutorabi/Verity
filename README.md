@@ -21,7 +21,7 @@ to Verity**. Text mode works with any key.
 
 ## What it does
 
-**Talk to it.** `gpt-realtime-2` over WebRTC, straight from the browser to
+**Talk to it.** `gpt-realtime-2.1` over WebRTC, straight from the browser to
 OpenAI. Speak naturally; interrupting works. The robot's mouth is driven by the
 waveform you are actually hearing, and the transcript prints onto its receipt
 paper as it speaks.
@@ -41,6 +41,31 @@ itself, colour-coded by severity. Mistral Document AI reports where each block
 sits; the PDF's own text layer narrows that to the sentence, so a mark frames
 the line it belongs to rather than the paragraph around it. A scan with no text
 layer falls back to the block.
+
+**Or be taught by her.** Ask her to explain a rule rather than answer a
+question and she looks it up and puts a lesson on the screen — three to five
+points that are each true and testable, what each one rests on, and the mistake
+people actually make. A spoken explanation is gone the moment it ends.
+
+**Or be examined.** "Quiz me on passive activity losses" and she writes an
+exam-style question, its hints, and its answer, and hands all three to the
+browser — which decides what is visible. So there is nothing for her to leak,
+a hint appears the moment it is asked for with no round trip, and the question
+stays on screen while you sit and think, which is the part of an exam a chat
+transcript is worst at. Every question is grounded in a provision she has read,
+so an argument about the answer gets settled against the text. Switch on the
+**interview bank** skill and she can also run a general accounting interview
+from 192 technical questions with model answers — the close, deferred tax,
+leases, costing, variances — marking each answer against what an interviewer is
+actually listening for.
+
+**With a document to hand.** `static/samples/` carries three specimens the
+opening screen offers in one click: a residential lease with an owner's
+accounting schedule, an independent contractor agreement, and a tax engagement
+letter. Every party and figure in them is invented, and they are written the way
+the real things are written — the engagement letter alone comes back with
+fifteen findings and citations into Circular 230 and the FBAR regulation. They
+are built by `scripts/build-samples.mjs`, so the wording is reviewable in a diff.
 
 **Teach her.** Settings carries *knowledge* — standing background about your
 practice, folded into the prompt as background rather than instruction — and

@@ -19,7 +19,8 @@ export const PACK_IDS = [
 	'review',
 	'critic',
 	'brief',
-	'study'
+	'study',
+	'interview'
 ] as const;
 
 export type PackId = (typeof PACK_IDS)[number];
@@ -49,5 +50,9 @@ export const PACKS: Record<PackId, { name: string; detail: string }> = {
 	study: {
 		name: 'Teaching and examining',
 		detail: 'Lessons on screen, and exam-style questions with hints and answers held back.'
+	},
+	interview: {
+		name: 'Accounting interview bank',
+		detail: '192 technical accounting interview questions with model answers, outside the CFR.'
 	}
 };

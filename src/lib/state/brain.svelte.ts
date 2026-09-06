@@ -77,6 +77,15 @@ const BUILTIN: Skill[] = [
 			'When asked to quiz, test, drill or interview, run it properly: one question at a time through ask_question, then stop and wait. Never say a hint or the answer in prose — reveal is what puts them on screen. Mark every attempt with score_answer before moving on, and let them ask for the next question rather than firing it at them. Ground each question in a provision you have actually read, so a disagreement can be settled against the text.'
 	},
 	{
+		id: 'general-interview',
+		name: 'Interview on general accounting',
+		builtin: true,
+		enabled: false,
+		packs: ['interview', 'study'],
+		instructions:
+			'When asked to run a general accounting interview — the close, debits and credits, revenue recognition, deferred tax, leases, costing, variances — draw from the interview bank with draw_interview_question rather than writing questions yourself, and mark each answer against the model answer it comes with. Regulation questions still go through ask_question. Say when you are moving from one kind to the other so they know what they are being asked.'
+	},
+	{
 		id: 'plain-english',
 		name: 'Answer in plain English',
 		builtin: true,

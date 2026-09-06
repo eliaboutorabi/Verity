@@ -12,7 +12,7 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import type { ToolRegistry } from '$lib/harness';
 import { createHarness } from '$lib/plugins';
-import { describeError, parseBrain, parseDocuments, parsePriorCalls } from '$lib/server/request';
+import { describeError, parseAskedQuestions, parseBrain, parseDocuments, parsePriorCalls } from '$lib/server/request';
 
 export const config = { runtime: 'nodejs22.x' };
 
@@ -34,7 +34,9 @@ export const POST: RequestHandler = async ({ request }) => {
 	const ctx = await createHarness({
 		documents,
 		packs: brain.packs,
-		priorCalls: parsePriorCalls(body.priorCalls)
+		priorCalls: parsePriorCalls(body.priorCalls),
+		askedQuestions: parseAskedQuestions(body.askedQuestions),
+		openQuestion: body.openQuestion === true
 	});
 
 	try {
