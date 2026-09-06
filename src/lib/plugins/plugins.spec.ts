@@ -103,6 +103,8 @@ describe('harness assembly', () => {
 			'find_rule_changes',
 			'highlight_document',
 			'list_documents',
+			'note_gap',
+			'pin_finding',
 			'read_regulation',
 			'review_document',
 			'search_regulations'

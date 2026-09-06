@@ -84,11 +84,16 @@
 		const size = box.getSize(new THREE.Vector3());
 		const center = box.getCenter(new THREE.Vector3());
 
-		// Headroom for the paper above her, and room below for the shadow she
-		// casts — framing her tightly crops the shadow off and she goes back to
-		// floating in nothing.
-		const headroom = size.y * 0.3;
-		const footroom = size.y * 0.12;
+		/*
+		 * Headroom for the paper above her, and room below for the shadow.
+		 *
+		 * Kept tight. Reserving 30% for a receipt that only exists while she is
+		 * printing left her permanently filling two-thirds of her own frame,
+		 * which is most of why she read as small. The paper may now brush the
+		 * top edge while it runs; she is worth more than the last inch of it.
+		 */
+		const headroom = size.y * 0.13;
+		const footroom = size.y * 0.07;
 		size.y += headroom + footroom;
 		center.y += headroom * 0.32 - footroom * 0.5;
 

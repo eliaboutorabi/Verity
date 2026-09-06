@@ -40,6 +40,8 @@ export class VerityRobot {
 	readonly mouth: Object3D;
 	/** The keypad, in reading order: +, −, ×, =. */
 	readonly keys: Object3D[];
+	/** The two eyes. Each carries its pupil group in `userData.pupilGroup`. */
+	readonly eyes: Object3D[];
 
 	paperProgress: number;
 	paperFeedDistance: number;

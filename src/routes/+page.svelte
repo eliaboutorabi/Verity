@@ -939,7 +939,7 @@
 		 */
 		.stage-frame {
 			grid-area: robot;
-			width: clamp(112px, 30vw, 168px);
+			width: clamp(132px, 34vw, 208px);
 			max-height: none;
 		}
 
@@ -971,7 +971,7 @@
 	/* A short phone in landscape has no room for a character at all. */
 	@media (max-width: 860px) and (max-height: 560px) {
 		.stage-frame {
-			width: 84px;
+			width: 108px;
 		}
 	}
 

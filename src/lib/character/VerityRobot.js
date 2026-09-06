@@ -8,6 +8,9 @@ export const VERITY_MODES = Object.freeze({
   SPEAKING: "speaking",
 });
 
+/** How far a pupil travels before it would leave the white of the eye. */
+const EYE_RADIUS_REACH = 0.072;
+
 export const VERITY_APPEARANCES = Object.freeze({
   classic: Object.freeze({
     accent: "#5B4CB0",
@@ -298,7 +301,7 @@ export class VerityRobot {
       specularIntensity: 0.18,
       bumpScale: 0.012,
     });
-    this.pupilMaterial = roundedMaterial(palette.mouth, 0.42, 0, {
+    this.pupilMaterial = roundedMaterial(palette.face, 0.34, 0, {
       specularIntensity: 0.85,
       clearcoat: 0.7,
       clearcoatRoughness: 0.24,
@@ -336,15 +339,20 @@ export class VerityRobot {
     /**
      * Eyes with pupils.
      *
-     * Two plain white ovals cannot look at anything — they change position, and
+     * Two plain white ovals cannot look at anything: they change position, and
      * a viewer reads that as the whole head shifting rather than as attention.
-     * A pupil is what makes a gaze legible: it travels further than the eye it
-     * sits in, so a small turn of the head reads as a deliberate look at a
-     * particular thing.
+     * A pupil is what makes a gaze legible.
      *
-     * The pupil is a child of the eye, so it inherits the blink for free.
+     * The eye is a sphere squashed to (1, 1.16, 0.52), so anything parented to
+     * it inherits that squash. A `pupilGroup` carries the inverse, and
+     * everything inside it is therefore in round, unsquashed units — which is
+     * the only way to reason about where the front surface of the eye is.
+     * Nesting the glint under the pupil instead compounded two compensations
+     * and threw it a clear unit in front of her face, where it read as a
+     * floating white ball rather than a highlight.
      */
-    const pupilGeometry = new THREE.SphereGeometry(0.115, 22, 16);
+    const EYE_RADIUS = 0.205;
+    const PUPIL_RADIUS = 0.101;
 
     this.eyes = [-0.7, 0.7].map((x) => {
       const eye = new THREE.Mesh(eyeGeometry, this.whiteMaterial);
@@ -354,25 +362,32 @@ export class VerityRobot {
       eye.castShadow = true;
       eye.renderOrder = 4;
 
-      const pupil = new THREE.Mesh(pupilGeometry, this.pupilMaterial);
-      // Undo the eye's own squash so the pupil stays round inside it.
-      pupil.scale.set(1, 1 / 1.16, 1 / 0.52);
-      pupil.position.set(0, 0, 0.42);
-      pupil.renderOrder = 5;
-      eye.add(pupil);
-      eye.userData.pupil = pupil;
+      const pupilGroup = new THREE.Group();
+      pupilGroup.scale.set(1, 1 / 1.16, 1 / 0.52);
+      eye.add(pupilGroup);
 
-      // A small specular highlight. It is the difference between an eye and a
-      // hole, and it costs one sphere.
+      // A lens rather than a ball: flattened against the front of the eye so
+      // it sits on the surface instead of bulging out of it.
+      const pupil = new THREE.Mesh(
+        new THREE.SphereGeometry(PUPIL_RADIUS, 24, 18),
+        this.pupilMaterial,
+      );
+      pupil.scale.z = 0.42;
+      pupil.position.z = EYE_RADIUS * 0.52 * 0.86;
+      pupil.renderOrder = 5;
+      pupilGroup.add(pupil);
+
+      // The highlight. It is the difference between an eye and a hole, and it
+      // costs one small sphere.
       const glint = new THREE.Mesh(
-        new THREE.SphereGeometry(0.042, 12, 10),
+        new THREE.SphereGeometry(PUPIL_RADIUS * 0.3, 12, 10),
         this.whiteMaterial,
       );
-      glint.scale.set(1, 1 / 1.16, 1 / 0.52);
-      glint.position.set(-0.055, 0.062, 0.62);
+      glint.position.set(-PUPIL_RADIUS * 0.34, PUPIL_RADIUS * 0.36, pupil.position.z + 0.026);
       glint.renderOrder = 6;
-      pupil.add(glint);
+      pupilGroup.add(glint);
 
+      eye.userData.pupilGroup = pupilGroup;
       this.floatGroup.add(eye);
       return eye;
     });
@@ -1129,23 +1144,23 @@ export class VerityRobot {
      *
      * `dragRotation` is where the head has turned to, and the pupil leads it —
      * she looks with her eyes slightly before her head arrives, which is what
-     * makes the gaze read as intent rather than as a head on a spring.
+     * makes a gaze read as intent rather than as a head on a spring.
+     *
+     * Same sign as the eye's own drift, and emphatically so: positive yaw is
+     * her looking right, and a pupil that slid left instead was the single
+     * most unsettling thing about her.
      */
-    const pupilX = THREE.MathUtils.clamp(-this.dragRotation.y * 1.9, -0.3, 0.3);
-    const pupilY = THREE.MathUtils.clamp(-this.dragRotation.x * 1.6, -0.22, 0.22);
+    const REACH = EYE_RADIUS_REACH;
+    const pupilX = THREE.MathUtils.clamp(this.dragRotation.y * 0.32, -REACH, REACH);
+    const pupilY = THREE.MathUtils.clamp(-this.dragRotation.x * 0.34, -REACH, REACH);
 
     this.eyes.forEach((eye, index) => {
       eye.scale.y = 1.24 * blink * squint;
 
-      const pupil = eye.userData.pupil;
-      if (pupil) {
-        pupil.position.x = THREE.MathUtils.damp(pupil.position.x, pupilX, 13, deltaTime);
-        pupil.position.y = THREE.MathUtils.damp(
-          pupil.position.y,
-          pupilY / 1.16,
-          13,
-          deltaTime,
-        );
+      const pupils = eye.userData.pupilGroup;
+      if (pupils) {
+        pupils.position.x = THREE.MathUtils.damp(pupils.position.x, pupilX, 13, deltaTime);
+        pupils.position.y = THREE.MathUtils.damp(pupils.position.y, pupilY, 13, deltaTime);
       }
       eye.position.x = THREE.MathUtils.damp(
         eye.position.x,
