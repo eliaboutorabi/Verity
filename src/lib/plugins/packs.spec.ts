@@ -3,7 +3,7 @@ import type { ToolRegistry } from '$lib/harness';
 import { createHarness } from './index.js';
 
 async function names(
-	packs?: readonly ('ecfr' | 'federal-register' | 'review' | 'critic' | 'brief')[]
+	packs?: readonly ('ecfr' | 'federal-register' | 'review' | 'critic' | 'brief' | 'study')[]
 ) {
 	const ctx = await createHarness({ packs });
 	const list = ctx.require<ToolRegistry>('tools').names().sort();
@@ -14,14 +14,18 @@ async function names(
 describe('tool packs', () => {
 	it('mounts everything by default, including markup', async () => {
 		expect(await names()).toEqual([
+			'ask_question',
 			'find_rule_changes',
 			'highlight_document',
 			'list_documents',
 			'note_gap',
 			'pin_finding',
 			'read_regulation',
+			'reveal',
 			'review_document',
-			'search_regulations'
+			'score_answer',
+			'search_regulations',
+			'teach_concept'
 		]);
 	});
 
@@ -40,6 +44,14 @@ describe('tool packs', () => {
 		const list = await names(['ecfr']);
 		expect(list).not.toContain('pin_finding');
 		expect(list).not.toContain('note_gap');
+	});
+
+	it('withholds teaching and examining when neither skill is on', async () => {
+		const list = await names(['ecfr']);
+		expect(list).not.toContain('ask_question');
+		expect(list).not.toContain('teach_concept');
+		expect(list).not.toContain('reveal');
+		expect(list).not.toContain('score_answer');
 	});
 
 	it('always keeps the CFR, whatever is asked for', async () => {

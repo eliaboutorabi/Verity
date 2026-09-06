@@ -12,6 +12,7 @@
 		BookOpen01Icon,
 		CheckmarkCircle02Icon,
 		File01Icon,
+		HelpCircleIcon,
 		Legal01Icon,
 		MapsLocation01Icon,
 		Search01Icon,
@@ -51,6 +52,9 @@
 		highlight: true,
 		// Already on screen in the brief; repeating it in the thread is noise.
 		brief: false,
+		// Both land in the question card above, which is where anyone is looking.
+		reveal: false,
+		verdict: false,
 		error: true,
 		generic: false
 	};
@@ -87,6 +91,10 @@
 				return `${value.marks.length} passage${value.marks.length === 1 ? '' : 's'} on ${value.documentName}`;
 			case 'brief':
 				return value.entries.map((entry) => entry.topic).join(' · ');
+			case 'reveal':
+				return value.what === 'hint' ? 'Hint shown above' : 'Answer shown above';
+			case 'verdict':
+				return value.feedback;
 			case 'error':
 				return value.detail;
 			default:
@@ -111,6 +119,10 @@
 		read_regulation: Legal01Icon,
 		find_rule_changes: BookOpen01Icon,
 		review_document: File01Icon,
+		teach_concept: BookOpen01Icon,
+		ask_question: HelpCircleIcon,
+		reveal: HelpCircleIcon,
+		score_answer: CheckmarkCircle02Icon,
 		list_documents: File01Icon,
 		highlight_document: MapsLocation01Icon
 	};

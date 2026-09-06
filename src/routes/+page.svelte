@@ -31,6 +31,7 @@
 	import { VoiceSession, type VoiceStatus } from '$lib/client/voice';
 	import { brain } from '$lib/state/brain.svelte';
 	import { brief } from '$lib/state/brief.svelte';
+	import { study } from '$lib/state/study.svelte';
 	import { conversation } from '$lib/state/conversation.svelte';
 	import { documents } from '$lib/state/documents.svelte';
 	import { pages } from '$lib/state/pages.svelte';
@@ -97,6 +98,7 @@
 			conversation.finishTool(callId, isError, view, durationMs);
 			absorbMarks(view as never);
 			absorbBrief(view as never);
+			absorbStudy(view as never);
 		},
 		onError: (message) => conversation.addNotice(message),
 		// Asked for at connect time, including after a reconnect, so a dropped
@@ -139,6 +141,28 @@
 	function absorbBrief(view?: { card: string } & Record<string, unknown>) {
 		if (view?.card !== 'brief') return;
 		brief.add(view.entries as never);
+	}
+
+	/**
+	 * The exam, which the browser runs rather than she does.
+	 *
+	 * She writes the question, its hints and its answer in one call; what is
+	 * visible is decided here. So a reveal is a flag flipping in a store, not a
+	 * message she has to be trusted not to say early.
+	 */
+	function absorbStudy(view?: { card: string } & Record<string, unknown>) {
+		switch (view?.card) {
+			case 'question':
+				study.ask(view.question as never);
+				break;
+			case 'reveal':
+				if (view.what === 'hint') study.revealHint();
+				else study.revealAnswer();
+				break;
+			case 'verdict':
+				study.score(view.verdict as never, view.feedback as string);
+				break;
+		}
 	}
 
 	function absorbMarks(view?: { card: string } & Record<string, unknown>) {
@@ -293,6 +317,7 @@
 				if (event.type === 'tool-result') {
 					absorbMarks(event.view as never);
 					absorbBrief(event.view as never);
+					absorbStudy(event.view as never);
 				}
 				if (event.type === 'text') {
 					textStreaming = true;
@@ -332,6 +357,7 @@
 		documents.clear();
 		pages.clear();
 		brief.clear();
+		study.clear();
 		briefOpen = false;
 		viewing = null;
 		stage?.clearTranscript();
@@ -520,7 +546,7 @@
 							</ul>
 						</div>
 					{:else}
-						<Transcript onshow={showOnPage} />
+						<Transcript onshow={showOnPage} onsend={send} />
 					{/if}
 				</div>
 

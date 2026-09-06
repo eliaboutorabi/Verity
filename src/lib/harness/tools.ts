@@ -74,11 +74,40 @@ export type ReviewFinding = {
 	title?: number;
 };
 
+/** One numbered option on a multiple-choice question. */
+export type ExamChoice = { label: string; text: string };
+
+/**
+ * One question she has put to the user.
+ *
+ * Hints and the answer travel with it and are withheld by the browser rather
+ * than by the model. That is the whole trick: the answer never has to appear in
+ * anything she says, so there is nothing to leak, and revealing a hint costs a
+ * click rather than a round trip.
+ */
+export type ExamQuestion = {
+	id: string;
+	/** Which of the exam's five areas this sits in. */
+	area: string;
+	topic: string;
+	/** The AICPA's own three levels, which is what a candidate is graded on. */
+	skill: 'recall' | 'application' | 'analysis';
+	prompt: string;
+	choices?: ExamChoice[];
+	hints: string[];
+	answer: string;
+	citation?: string;
+};
+
+/** One numbered point in an explanation. */
+export type LessonPoint = { heading: string; detail: string; citation?: string };
+
 export type ToolCallView =
 	| { card: 'generic'; title: string; detail?: string }
 	| { card: 'search'; title: string; query: string }
 	| { card: 'regulation'; title: string; citation: string }
-	| { card: 'review'; title: string; documentName: string };
+	| { card: 'review'; title: string; documentName: string }
+	| { card: 'teaching'; title: string; topic: string };
 
 export type ToolResultView =
 	| { card: 'generic'; title: string; detail?: string }
@@ -94,6 +123,22 @@ export type ToolResultView =
 			marks: DocumentMark[];
 	  }
 	| { card: 'brief'; title: string; entries: BriefEntry[] }
+	| {
+			card: 'lesson';
+			title: string;
+			topic: string;
+			summary: string;
+			points: LessonPoint[];
+			pitfall?: string;
+	  }
+	| { card: 'question'; title: string; question: ExamQuestion }
+	| { card: 'reveal'; title: string; what: 'hint' | 'answer' }
+	| {
+			card: 'verdict';
+			title: string;
+			verdict: 'correct' | 'partly' | 'incorrect';
+			feedback: string;
+	  }
 	| { card: 'error'; title: string; detail: string };
 
 // ---------------------------------------------------------------- definitions

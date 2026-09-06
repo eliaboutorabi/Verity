@@ -100,14 +100,18 @@ describe('harness assembly', () => {
 		const names = schemas.map((schema) => schema.name).sort();
 
 		expect(names).toEqual([
+			'ask_question',
 			'find_rule_changes',
 			'highlight_document',
 			'list_documents',
 			'note_gap',
 			'pin_finding',
 			'read_regulation',
+			'reveal',
 			'review_document',
-			'search_regulations'
+			'score_answer',
+			'search_regulations',
+			'teach_concept'
 		]);
 		for (const schema of schemas) {
 			expect(schema.description.length).toBeGreaterThan(40);

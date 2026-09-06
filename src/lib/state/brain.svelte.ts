@@ -14,6 +14,7 @@
  */
 
 import { browser } from '$app/environment';
+import { PACK_IDS, type PackId } from '$lib/packs';
 
 export interface Skill {
 	id: string;
@@ -27,31 +28,7 @@ export interface Skill {
 	packs?: readonly PackId[];
 }
 
-/** The tool-owning plugins a skill can require. */
-export type PackId = 'ecfr' | 'federal-register' | 'review' | 'critic' | 'brief';
-
-export const PACKS: Record<PackId, { name: string; detail: string }> = {
-	ecfr: {
-		name: 'Code of Federal Regulations',
-		detail: 'Search and read the current text of the CFR.'
-	},
-	'federal-register': {
-		name: 'Federal Register',
-		detail: 'Proposed and final rules, effective dates, comment deadlines.'
-	},
-	review: {
-		name: 'Document review',
-		detail: 'Scan a loaded document for passages carrying a regulatory exposure.'
-	},
-	critic: {
-		name: 'Second opinion',
-		detail: 'A separate model call that reads the answer back before you see it.'
-	},
-	brief: {
-		name: 'The brief',
-		detail: 'Findings and open questions written down as she goes, ready to take away.'
-	}
-};
+export { PACKS, type PackId } from '$lib/packs';
 
 const BUILTIN: Skill[] = [
 	{
@@ -80,6 +57,24 @@ const BUILTIN: Skill[] = [
 		packs: ['brief'],
 		instructions:
 			'Pin what matters to the brief while you work, not at the end: anything that needs acting on, watching or documenting, with the provision it rests on. Note what you could not settle as an open question rather than hedging in prose. Never pin a finding resting on a citation you did not read. Do not read the brief back — it is already on screen.'
+	},
+	{
+		id: 'tutor',
+		name: 'Teach it, do not just answer it',
+		builtin: true,
+		enabled: true,
+		packs: ['study', 'ecfr'],
+		instructions:
+			'When someone is trying to learn a rule rather than apply it to a live file — studying, getting up to speed, asking how something actually works — look the provision up and put a lesson on screen with teach_concept, then talk them through the summary rather than reading the points back. Offer one exam-style question at the end so they can find out whether it landed.'
+	},
+	{
+		id: 'interviewer',
+		name: 'Examine like an interviewer',
+		builtin: true,
+		enabled: true,
+		packs: ['study', 'ecfr'],
+		instructions:
+			'When asked to quiz, test, drill or interview, run it properly: one question at a time through ask_question, then stop and wait. Never say a hint or the answer in prose — reveal is what puts them on screen. Mark every attempt with score_answer before moving on, and let them ask for the next question rather than firing it at them. Ground each question in a provision you have actually read, so a disagreement can be settled against the text.'
 	},
 	{
 		id: 'plain-english',

@@ -25,9 +25,11 @@ import { reviewPlugin } from './review.js';
 import { verifyPlugin } from './verify.js';
 import { criticPlugin } from './critic.js';
 import { briefPlugin } from './brief.js';
+import { PACK_IDS, type PackId } from '$lib/packs';
+import { studyPlugin } from './study.js';
 
 /** The plugins a caller can mount: tool packs, plus the optional critic. */
-export type PackId = 'ecfr' | 'federal-register' | 'review' | 'critic' | 'brief';
+export { PACK_IDS, type PackId } from '$lib/packs';
 
 /**
  * What a plugin needs to make a model call of its own.
@@ -78,9 +80,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Conte
 
 	if (options.credentials) ctx.provide('credentials', options.credentials);
 
-	const packs = new Set<PackId>(
-		options.packs ?? ['ecfr', 'federal-register', 'review', 'critic', 'brief']
-	);
+	const packs = new Set<PackId>(options.packs ?? PACK_IDS);
 	// The CFR is the whole point; a caller cannot leave the app with no way to
 	// look anything up.
 	packs.add('ecfr');
@@ -88,6 +88,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Conte
 	if (packs.has('ecfr')) await ctx.plugin(ecfrPlugin);
 	if (packs.has('federal-register')) await ctx.plugin(federalRegisterPlugin);
 	if (packs.has('brief')) await ctx.plugin(briefPlugin);
+	if (packs.has('study')) await ctx.plugin(studyPlugin);
 	if (packs.has('review')) {
 		await ctx.plugin(reviewPlugin);
 		await ctx.plugin(highlightPlugin);
@@ -119,3 +120,4 @@ export async function toolSchemas(packs?: readonly PackId[]) {
 export { MAX_DOCUMENT_CHARS, type DocumentStore, type StoredDocument } from './documents.js';
 export { REVIEW_RULES, scanDocument, type ReviewRule, type Severity } from './review-rules.js';
 export type { PriorCall } from './loop-guard.js';
+export { EXAM_AREAS } from './study.js';

@@ -3,10 +3,19 @@
 	import { CheckmarkBadge01Icon, Loading03Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 	import Icon from './Icon.svelte';
 	import ToolCard from './ToolCard.svelte';
+	import QuestionCard from './QuestionCard.svelte';
+	import LessonCard from './LessonCard.svelte';
 	import { renderMarkdown } from '$lib/markdown';
 	import { conversation } from '$lib/state/conversation.svelte';
 
-	let { onshow }: { onshow?: (documentId: string, quote: string) => void } = $props();
+	let {
+		onshow,
+		onsend
+	}: {
+		onshow?: (documentId: string, quote: string) => void;
+		/** Ask her something on the reader's behalf, from inside a card. */
+		onsend?: (text: string) => void;
+	} = $props();
 
 	let scroller = $state<HTMLDivElement | null>(null);
 	let pinned = $state(true);
@@ -78,7 +87,22 @@
 					{/if}
 				</div>
 			{:else if entry.kind === 'tool'}
-				<ToolCard {entry} {onshow} />
+				<!--
+					A question and a lesson are the point of the turn, not a note about
+					it, so they skip the collapsible tool-card chrome entirely.
+				-->
+				{#if entry.result?.card === 'question'}
+					<QuestionCard questionId={entry.result.question.id} {onsend} />
+				{:else if entry.result?.card === 'lesson'}
+					<LessonCard
+						topic={entry.result.topic}
+						summary={entry.result.summary}
+						points={entry.result.points}
+						pitfall={entry.result.pitfall}
+					/>
+				{:else}
+					<ToolCard {entry} {onshow} />
+				{/if}
 			{:else}
 				<p class="notice" data-tone={entry.tone}>{entry.text}</p>
 			{/if}

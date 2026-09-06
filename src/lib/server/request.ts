@@ -8,6 +8,7 @@
  * out of the project.
  */
 
+import { PACK_IDS, type PackId } from '$lib/packs';
 import { error } from '@sveltejs/kit';
 import { MAX_DOCUMENT_CHARS, type StoredDocument } from '$lib/plugins';
 
@@ -49,9 +50,6 @@ export function parseDocuments(raw: unknown): StoredDocument[] {
 		} satisfies StoredDocument;
 	});
 }
-
-const PACK_IDS = ['ecfr', 'federal-register', 'review', 'critic', 'brief'] as const;
-type PackId = (typeof PACK_IDS)[number];
 
 export interface BrainPayload {
 	knowledge: string;
