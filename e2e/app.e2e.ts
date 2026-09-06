@@ -64,7 +64,7 @@ test.describe('the theme', () => {
 		const ground = await page.evaluate(() =>
 			getComputedStyle(document.documentElement).getPropertyValue('--ground').trim()
 		);
-		expect(ground).toBe('#0e1226');
+		expect(ground).toBe('#0b0e1e');
 
 		await page.reload();
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

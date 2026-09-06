@@ -18,6 +18,48 @@ export const VERITY_MODES = Object.freeze({
  */
 const EYE_RADIUS_REACH = 0.07;
 
+/**
+ * How she is finished in a dark room.
+ *
+ * Only the surfaces that catch light, and only enough to take the glare off:
+ * an ivory shell that is right on a bone-coloured page is a lamp on a dark one,
+ * and the eye goes to it instead of to the answer. Her screen goes *darker*
+ * rather than lighter, so the face stays the darkest thing about her and the
+ * eyes still read; the paper stays near-white, because paper is.
+ */
+const DARK_FINISH = Object.freeze({
+  classic: Object.freeze({
+    body: 0xbdb9bb,
+    bodySide: 0xa6a2a5,
+    faceRim: 0x76737a,
+    face: 0x0a0d1c,
+    key: 0x4b4e5d,
+    symbol: 0xeceaf4,
+    mouth: 0x9294a3,
+    slot: 0x33353f,
+    paper: 0xe8e6e0,
+    paperBack: 0xcecabf,
+    paperEdge: 0xb6b1a6,
+    paperCss: "#e8e6e0",
+    paperRgb: "232, 230, 224",
+  }),
+  rose: Object.freeze({
+    body: 0xc4a6ae,
+    bodySide: 0xac8b96,
+    faceRim: 0x7d626e,
+    face: 0x1a0d14,
+    key: 0x654a58,
+    symbol: 0xf3e3ea,
+    mouth: 0xb695a5,
+    slot: 0x3d2c36,
+    paper: 0xecd9e1,
+    paperBack: 0xd2bcc6,
+    paperEdge: 0xba9fac,
+    paperCss: "#ecd9e1",
+    paperRgb: "236, 217, 225",
+  }),
+});
+
 export const VERITY_APPEARANCES = Object.freeze({
   classic: Object.freeze({
     accent: "#5B4CB0",
@@ -206,8 +248,12 @@ export class VerityRobot {
     appearance = VERITY_DEFAULTS.appearance,
     accent = null,
     scale = VERITY_DEFAULTS.scale,
+    dark = false,
   } = {}) {
-    const palette = VERITY_APPEARANCES[appearance] ?? VERITY_APPEARANCES.classic;
+    const named = VERITY_APPEARANCES[appearance] ? appearance : "classic";
+    const palette = dark
+      ? { ...VERITY_APPEARANCES[named], ...DARK_FINISH[named] }
+      : VERITY_APPEARANCES[named];
     this.root = new THREE.Group();
     this.root.name = "VerityRobot";
 
@@ -236,7 +282,8 @@ export class VerityRobot {
     this.root.add(this.floatGroup);
 
     this.reducedMotion = reducedMotion;
-    this.appearance = VERITY_APPEARANCES[appearance] ? appearance : "classic";
+    this.appearance = named;
+    this.dark = dark;
     this.palette = palette;
     this.accent = accent ?? palette.accent;
     this.maxAnisotropy = renderer?.capabilities?.getMaxAnisotropy?.() ?? 1;

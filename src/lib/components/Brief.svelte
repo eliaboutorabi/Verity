@@ -67,7 +67,7 @@
 			here, and you can take it away as a memo.
 		</p>
 	{:else}
-		<div class="scroll">
+		<div class="scroll fade-edges">
 			{#if brief.findings.length}
 				<ul class="findings">
 					{#each brief.findings as item (item.id)}
@@ -144,9 +144,10 @@
 
 	h2 {
 		margin: 0;
-		font-size: 10.5px;
-		font-weight: 800;
-		letter-spacing: 0.12em;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: var(--muted);
 	}
@@ -318,9 +319,9 @@
 
 	.cite {
 		justify-self: start;
-		font-size: 10.5px;
-		font-weight: 700;
-		font-variant-numeric: tabular-nums;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		font-weight: 500;
 		color: var(--accent);
 		background: var(--accent-soft);
 		border-radius: 999px;
@@ -333,9 +334,10 @@
 		align-items: center;
 		gap: 6px;
 		margin: 0;
-		font-size: 10.5px;
-		font-weight: 800;
-		letter-spacing: 0.1em;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--muted);
 	}

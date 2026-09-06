@@ -18,6 +18,8 @@ export interface VerityRobotOptions {
 	/** Lets the receipt texture use the device's maximum anisotropy. */
 	renderer?: WebGLRenderer | null;
 	appearance?: VerityAppearance;
+	/** Take the glare off her shell for a dark page. */
+	dark?: boolean;
 	accent?: string;
 	scale?: number;
 	reducedMotion?: boolean;

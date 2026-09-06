@@ -54,6 +54,20 @@
 	--severity-low: #4a6f8f;
 	--severity-info: #6f7690;
 
+	/*
+	 * Three faces, each with a job.
+	 *
+	 * Fraunces carries the headings: a regulations tool wants some editorial
+	 * weight, and a warm serif against a rounded plastic robot is the contrast
+	 * that keeps the app from reading as either a toy or a form. Inter runs
+	 * everything you actually read. Citations get a mono, because "26 CFR
+	 * § 1.471-1" is a reference number and setting it in prose type makes it
+	 * look like a phrase — it wants to be scannable, aligned and unmistakably a
+	 * label.
+	 */
+	--font-display: Fraunces, 'Iowan Old Style', Georgia, serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
 	--radius-lg: 26px;
 	--radius-md: 18px;
 	--radius-sm: 12px;
@@ -98,20 +112,27 @@
  * there is a single place to read for what the page is currently wearing.
  */
 :root[data-theme='dark'] {
-	--ground: #0e1226;
-	--paper: #181d34;
-	--surface: #212745;
-	--ink: #edeffb;
-	--ink-soft: #c3c8e2;
-	--muted: #8d94b1;
-	--accent: #a396f5;
-	--accent-soft: #262c4e;
-	--line: rgba(206, 214, 255, 0.12);
-	--line-strong: rgba(206, 214, 255, 0.24);
+	--ground: #0b0e1e;
+	--paper: #161b31;
+	--surface: #1e2440;
+	--ink: #eef0fc;
+	--ink-soft: #c4c9e4;
+	--muted: #8c93b2;
+	--accent: #a89bff;
+	--accent-soft: #241f4a;
+	--line: rgba(200, 210, 255, 0.11);
+	--line-strong: rgba(200, 210, 255, 0.22);
 
-	--severity-high: #f0798c;
-	--severity-medium: #e4a457;
-	--severity-low: #82aed3;
+	/*
+	 * Real hue separation.
+	 *
+	 * On a violet ground, four severities two steps apart all resolve to the
+	 * same lilac. These are pushed to distinct corners of the wheel and lifted
+	 * in chroma so a card's colour is information rather than decoration.
+	 */
+	--severity-high: #ff7d92;
+	--severity-medium: #f2b25c;
+	--severity-low: #6fc3d6;
 	--severity-info: #9aa1bd;
 
 	--shadow-card:
@@ -134,14 +155,40 @@
 }
 
 :root[data-theme='dark'][data-character='rose'] {
-	--accent: #f191b8;
-	--accent-soft: #3a2233;
-	--ink: #fae9f1;
-	--ink-soft: #dcc3d0;
-	--muted: #ab8e9e;
-	--ground: #150e1b;
-	--paper: #1f1526;
-	--surface: #2b1c33;
+	/*
+	 * Rosie after dark.
+	 *
+	 * The first attempt was a room lit entirely in lavender — ground, cards and
+	 * accent all within a few degrees of each other, so everything came out the
+	 * same milky purple and nothing stood forward. This pulls the ground down
+	 * to a near-black with a warm red undertone and leaves the pink to be the
+	 * only saturated thing in the room, which is what makes it read as pink at
+	 * all.
+	 */
+	--ground: #120a10;
+	--paper: #1d1119;
+	--surface: #271721;
+	--ink: #fdeaf1;
+	--ink-soft: #e0c4d0;
+	--muted: #ab8b99;
+	--accent: #ff8fb9;
+	--accent-soft: #34161f;
+	--line: rgba(255, 214, 230, 0.11);
+	--line-strong: rgba(255, 214, 230, 0.22);
+
+	--severity-high: #ff7f8f;
+	--severity-medium: #f0b25f;
+	--severity-low: #77c4c9;
+
+	--sky: rgba(214, 120, 164, 0.14);
+	--glow-tint: #3a1e2c;
+	--cta-ink: #1a0d14;
+	--scrim: rgba(10, 4, 8, 0.6);
+	--scrim-strong: rgba(10, 4, 8, 0.7);
+	--logo-body: #f0cddc;
+	--logo-paper: #7d5265;
+	--logo-screen: #180b12;
+	--scroll-thumb: rgba(255, 214, 230, 0.18);
 }
 
 html,
@@ -173,22 +220,37 @@ button {
 	border-radius: 6px;
 }
 
-/* A scrollbar that does not fight the paper surfaces. */
+/*
+ * No scrollbars.
+ *
+ * Every scrolling region in the app is masked at its top and bottom edge, so
+ * content dissolves rather than stopping at a line — which says "there is more"
+ * far better than a grey rail does, and without cutting a channel through the
+ * layout at every panel boundary. Wheel, trackpad, keyboard and touch all still
+ * work; only the chrome is gone.
+ */
 * {
-	scrollbar-width: thin;
-	scrollbar-color: var(--scroll-thumb) transparent;
+	scrollbar-width: none;
 }
 
 *::-webkit-scrollbar {
-	width: 10px;
-	height: 10px;
+	width: 0;
+	height: 0;
 }
 
-*::-webkit-scrollbar-thumb {
-	background: var(--scroll-thumb);
-	border: 3px solid transparent;
-	border-radius: 999px;
-	background-clip: content-box;
+/*
+ * The mask itself. Applied to a scroll container, it fades the first and last
+ * few pixels of its content to nothing.
+ */
+.fade-edges {
+	--fade: 22px;
+	mask-image: linear-gradient(
+		to bottom,
+		transparent 0,
+		#000 var(--fade),
+		#000 calc(100% - var(--fade)),
+		transparent 100%
+	);
 }
 
 @media (prefers-reduced-motion: reduce) {

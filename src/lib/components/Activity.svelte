@@ -119,9 +119,10 @@
 
 	h2 {
 		margin: 0 0 8px;
-		font-size: 10.5px;
-		font-weight: 800;
-		letter-spacing: 0.12em;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: var(--muted);
 	}

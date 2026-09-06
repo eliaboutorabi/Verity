@@ -31,7 +31,7 @@
 	});
 </script>
 
-<div class="scroller" class:scrolled bind:this={scroller} onscroll={onScroll}>
+<div class="scroller fade-edges" class:scrolled bind:this={scroller} onscroll={onScroll}>
 	<div class="thread">
 		{#each conversation.entries as entry (entry.id)}
 			{#if entry.kind === 'user'}

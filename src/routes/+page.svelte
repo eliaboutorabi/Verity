@@ -443,6 +443,7 @@
 				<RobotStage
 					bind:this={stage}
 					character={session.character}
+					dark={session.theme === 'dark'}
 					mode={robotMode}
 					{audioLevel}
 					{mouth}
@@ -470,7 +471,7 @@
 			</div>
 
 			{#if unlocked}
-				<div class="deck">
+				<div class="deck fade-edges">
 					<Activity hints={CAPABILITIES} />
 				</div>
 			{/if}
@@ -600,15 +601,23 @@
 		justify-content: space-between;
 		gap: 12px;
 		padding: 0 clamp(14px, 2.6vw, 40px);
-		background: color-mix(in srgb, var(--ground) 70%, transparent);
-		backdrop-filter: blur(20px) saturate(150%);
-		-webkit-backdrop-filter: blur(20px) saturate(150%);
-		border-bottom: 1px solid transparent;
-		transition: border-color 220ms var(--ease);
+		/*
+		 * Nothing behind it.
+		 *
+		 * A frosted bar has to tint and blur whatever it sits on, and the page
+		 * sits on a vertical gradient — so the bar sampled a different colour
+		 * from the one beside it and drew a band across the top of the app. The
+		 * background is one continuous wash now, and the bar's own controls
+		 * carry their own surfaces. What stops text colliding with it is the
+		 * mask on the columns below, which fades content out before it arrives
+		 * rather than sliding it under a pane of glass.
+		 */
+		background: none;
+		pointer-events: none;
 	}
 
-	.app:has(:global(.scrolled)) .bar {
-		border-bottom-color: var(--line);
+	.bar > * {
+		pointer-events: auto;
 	}
 
 	.brand {
@@ -778,10 +787,12 @@
 
 	.opening h2 {
 		margin: 0;
-		font-size: clamp(26px, 2.6vw, 38px);
-		font-weight: 700;
-		letter-spacing: -0.034em;
-		line-height: 1.1;
+		font-family: var(--font-display);
+		font-size: clamp(30px, 3.1vw, 46px);
+		font-weight: 600;
+		font-optical-sizing: auto;
+		letter-spacing: -0.02em;
+		line-height: 1.04;
 	}
 
 	.opening p {
@@ -804,14 +815,20 @@
 	.suggestions button {
 		width: 100%;
 		text-align: left;
+		/*
+		 * Openings, not primary actions. Filled cards with a drop shadow read
+		 * as three heavy slabs before anyone has asked anything; a hairline on
+		 * a barely-there surface leaves the heading the loudest thing on the
+		 * page, which is what it should be.
+		 */
 		border: 1px solid var(--line);
-		background: var(--surface);
-		border-radius: 16px;
-		padding: 13px 17px;
-		font-size: 14px;
+		background: color-mix(in srgb, var(--surface) 55%, transparent);
+		border-radius: 14px;
+		padding: 12px 16px;
+		font-size: 14.5px;
 		line-height: 1.45;
+		color: var(--ink-soft);
 		cursor: pointer;
-		box-shadow: var(--shadow-card);
 		transition:
 			transform 180ms var(--ease),
 			border-color 180ms var(--ease),
@@ -820,8 +837,10 @@
 
 	.suggestions button:hover {
 		transform: translateX(4px);
+		color: var(--ink);
+		background: var(--surface);
 		border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
-		box-shadow: var(--shadow-float);
+		box-shadow: var(--shadow-card);
 	}
 
 	/* ----------------------------------------------------------------- rail */
@@ -878,7 +897,23 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
-		border-left: 1px solid var(--line);
+		/*
+		 * A rule that starts and ends nowhere.
+		 *
+		 * A hard 1px line from the top of the viewport to the bottom cuts the
+		 * page in two and fights the single wash the background is trying to
+		 * be. Fading it out at both ends separates the columns without drawing
+		 * a border around anything.
+		 */
+		border-left: 1px solid transparent;
+		border-image: linear-gradient(
+				to bottom,
+				transparent,
+				var(--line) 12%,
+				var(--line) 88%,
+				transparent
+			)
+			1;
 		padding-left: clamp(16px, 1.6vw, 28px);
 	}
 
@@ -937,7 +972,23 @@
 			max-height: none;
 			border-radius: 22px 0 0 22px;
 			border-top: 0;
-			border-left: 1px solid var(--line);
+			/*
+		 * A rule that starts and ends nowhere.
+		 *
+		 * A hard 1px line from the top of the viewport to the bottom cuts the
+		 * page in two and fights the single wash the background is trying to
+		 * be. Fading it out at both ends separates the columns without drawing
+		 * a border around anything.
+		 */
+		border-left: 1px solid transparent;
+		border-image: linear-gradient(
+				to bottom,
+				transparent,
+				var(--line) 12%,
+				var(--line) 88%,
+				transparent
+			)
+			1;
 		}
 
 		@keyframes slide {
@@ -998,7 +1049,7 @@
 		}
 
 		.opening h2 {
-			font-size: clamp(22px, 6vw, 28px);
+			font-size: clamp(25px, 7vw, 32px);
 		}
 	}
 

@@ -23,6 +23,8 @@
 
 	interface Props {
 		character: CharacterId;
+		/** Finish her for a dark page rather than a bone-coloured one. */
+		dark?: boolean;
 		mode: 'idle' | 'listening' | 'thinking' | 'speaking';
 		audioLevel?: number;
 		audible?: boolean;
@@ -43,6 +45,7 @@
 
 	let {
 		character,
+		dark = false,
 		mode,
 		audioLevel = 0,
 		audible = false,
@@ -301,12 +304,15 @@
 		};
 	});
 
-	// Swapping characters rebuilds the character but not the scene around it.
+	// Swapping characters — or the theme — rebuilds her, but not the scene
+	// around her. Her finish is baked into her materials, so it is a rebuild
+	// rather than a tint.
 	$effect(() => {
 		const appearance = CHARACTERS[character].appearance;
+		const finish = dark;
 		if (!ready || !renderer || !scene || !canvas) return;
 
-		const next = new VerityRobot({ renderer, appearance });
+		const next = new VerityRobot({ renderer, appearance, dark: finish });
 		scene.add(next.object3d);
 		robot = next;
 		detachPointer = attachVerityPointerControls(canvas, next);

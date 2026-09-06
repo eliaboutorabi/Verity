@@ -81,17 +81,20 @@
 
 	.eyebrow {
 		margin: 0;
-		font-size: 11px;
-		font-weight: 800;
-		letter-spacing: 0.12em;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: var(--accent);
 	}
 
 	h2 {
 		margin: 4px 0 0;
-		font-size: clamp(24px, 3.4vw, 31px);
-		font-weight: 700;
+		font-family: var(--font-display);
+		font-size: clamp(27px, 3.8vw, 38px);
+		font-weight: 600;
+		font-optical-sizing: auto;
 		letter-spacing: -0.03em;
 		line-height: 1.15;
 	}

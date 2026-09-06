@@ -446,9 +446,15 @@
 
 	.citation {
 		display: inline-block;
-		font-size: 11px;
-		font-weight: 700;
-		letter-spacing: 0.02em;
+		/*
+		 * A citation is a reference number, not a phrase. Set in prose type it
+		 * reads as words; set in mono it reads as a label you can scan a column
+		 * of, and the section numbers line up.
+		 */
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		font-weight: 500;
+		letter-spacing: -0.01em;
 		color: var(--accent);
 		background: var(--accent-soft);
 		border-radius: 999px;
@@ -560,9 +566,10 @@
 
 	.severity {
 		display: inline-block;
-		font-size: 10.5px;
-		font-weight: 800;
-		letter-spacing: 0.08em;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--muted);
 		margin-right: 8px;
@@ -679,8 +686,9 @@
 	.brief-echo .cite {
 		display: inline-block;
 		margin-top: 4px;
-		font-size: 10.5px;
-		font-weight: 700;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		font-weight: 500;
 		color: var(--accent);
 		background: var(--accent-soft);
 		border-radius: 999px;
