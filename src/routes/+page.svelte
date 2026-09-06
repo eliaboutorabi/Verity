@@ -8,7 +8,13 @@
 	 * which transport carries the turn.
 	 */
 	import { onMount, tick } from 'svelte';
-	import { ClipboardIcon, Comment01Icon, Settings02Icon } from '@hugeicons/core-free-icons';
+	import {
+		ClipboardIcon,
+		Comment01Icon,
+		Moon02Icon,
+		Settings02Icon,
+		Sun03Icon
+	} from '@hugeicons/core-free-icons';
 	import Activity from '$lib/components/Activity.svelte';
 	import Brief from '$lib/components/Brief.svelte';
 	import Composer from '$lib/components/Composer.svelte';
@@ -165,12 +171,17 @@
 
 		// The brief earns a column of its own only when there is a column to
 		// spare; below that it is a drawer, so it never squeezes the answer.
+		const dark = window.matchMedia('(prefers-color-scheme: dark)');
+		const followSystem = () => session.systemThemeChanged(dark.matches ? 'dark' : 'light');
+		dark.addEventListener('change', followSystem);
+
 		const columns = window.matchMedia('(min-width: 1280px)');
 		const sync = () => (wide = columns.matches);
 		sync();
 		columns.addEventListener('change', sync);
 
 		return () => {
+			dark.removeEventListener('change', followSystem);
 			columns.removeEventListener('change', sync);
 			voice.stop();
 		};
@@ -179,6 +190,12 @@
 	// The character drives the accent colour for the whole document.
 	$effect(() => {
 		document.documentElement.dataset.character = session.character;
+	});
+
+	// And the theme drives everything else. The head script set this before the
+	// first paint; from here it is ours.
+	$effect(() => {
+		document.documentElement.dataset.theme = session.theme;
 	});
 
 	async function toggleVoice() {
@@ -390,6 +407,16 @@
 				<button class="bar-button" type="button" onclick={startOver} disabled={conversation.isEmpty}>
 					<Icon icon={Comment01Icon} size={17} />
 					<span>New</span>
+				</button>
+				<button
+					class="bar-button icon-only"
+					type="button"
+					aria-label={session.theme === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme'}
+					title={session.theme === 'dark' ? 'Light' : 'Dark'}
+					aria-pressed={session.theme === 'dark'}
+					onclick={() => session.toggleTheme()}
+				>
+					<Icon icon={session.theme === 'dark' ? Sun03Icon : Moon02Icon} size={18} />
 				</button>
 				<button
 					class="bar-button icon-only"
@@ -820,7 +847,7 @@
 	}
 
 	.rail a:hover {
-		background: color-mix(in srgb, var(--accent) 20%, white);
+		background: color-mix(in srgb, var(--accent) 24%, var(--surface));
 	}
 
 	.composer-slot {
@@ -865,7 +892,7 @@
 		position: fixed;
 		inset: 0;
 		z-index: 45;
-		background: color-mix(in srgb, var(--ink) 32%, transparent);
+		background: var(--scrim);
 		backdrop-filter: blur(4px);
 		animation: fade 200ms var(--ease) both;
 	}

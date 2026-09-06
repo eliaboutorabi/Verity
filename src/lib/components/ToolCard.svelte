@@ -369,7 +369,7 @@
 	}
 
 	[data-state='error'] .glyph {
-		background: color-mix(in srgb, var(--severity-high) 12%, white);
+		background: color-mix(in srgb, var(--severity-high) 14%, var(--surface));
 		color: var(--severity-high);
 	}
 

@@ -13,6 +13,8 @@ const KEY_STORAGE = 'regassist.openai-key';
 const MISTRAL_STORAGE = 'regassist.mistral-key';
 const MODEL_STORAGE = 'regassist.model';
 const CHARACTER_STORAGE = 'regassist.character';
+/** Read by the inline script in app.html too — keep the name in step. */
+const THEME_STORAGE = 'regassist.theme';
 
 function read(key: string): string | null {
 	if (!browser) return null;
@@ -32,6 +34,25 @@ function write(key: string, value: string | null): void {
 	} catch {
 		// Ignore: the session still works, it just will not be remembered.
 	}
+}
+
+export type Theme = 'light' | 'dark';
+
+/**
+ * What the page is wearing right now.
+ *
+ * Stored only once the reader has actually chosen. Until then it follows the
+ * system, and keeps following it — someone whose machine turns dark at sunset
+ * should not have to come back and press a button.
+ */
+function storedTheme(): Theme | null {
+	const value = read(THEME_STORAGE);
+	return value === 'light' || value === 'dark' ? value : null;
+}
+
+function systemTheme(): Theme {
+	if (!browser) return 'light';
+	return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 export interface ModelAvailability {
@@ -55,6 +76,10 @@ class SessionState {
 	character = $state<CharacterId>(
 		isCharacterId(read(CHARACTER_STORAGE)) ? (read(CHARACTER_STORAGE) as CharacterId) : 'classic'
 	);
+
+	theme = $state<Theme>(storedTheme() ?? systemTheme());
+	/** True while the theme is whatever the system says, rather than a choice. */
+	followsSystem = $state(storedTheme() === null);
 
 	availableModels = $state<string[]>([]);
 	realtimeAvailable = $state(true);
@@ -94,6 +119,18 @@ class SessionState {
 	setCharacter(value: CharacterId): void {
 		this.character = value;
 		write(CHARACTER_STORAGE, value);
+	}
+
+	/** Take the other one, and stop following the system from here on. */
+	toggleTheme(): void {
+		this.theme = this.theme === 'dark' ? 'light' : 'dark';
+		this.followsSystem = false;
+		write(THEME_STORAGE, this.theme);
+	}
+
+	/** The system changed its mind, and we are still listening. */
+	systemThemeChanged(theme: Theme): void {
+		if (this.followsSystem) this.theme = theme;
 	}
 
 	/**

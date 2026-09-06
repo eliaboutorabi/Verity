@@ -28,6 +28,26 @@
 	--accent-soft: #ece9f8;
 	--line: rgba(21, 27, 51, 0.1);
 	--line-strong: rgba(21, 27, 51, 0.18);
+	/* The wash behind the page, and the pool of light under the robot. */
+	--sky: rgba(255, 255, 255, 0.92);
+	--glow-tint: #ffffff;
+	/*
+	 * The one loud button on the page. In the light it is ink on bone; in the
+	 * dark, inverting it would put a white slab in the corner of a quiet room,
+	 * so it becomes the accent instead.
+	 */
+	--cta: var(--ink);
+	--cta-ink: var(--paper);
+	/* What a dialog puts between itself and the page. Always darker than the
+	   page, which "ink at 34%" stops being the moment ink turns pale. */
+	--scrim: rgba(18, 22, 47, 0.34);
+	--scrim-strong: rgba(18, 22, 47, 0.42);
+
+	/* She is an object, not text, so her mark does not invert with the ink. */
+	--logo-body: #12162f;
+	--logo-paper: #dfe0e8;
+	--logo-screen: #090c1a;
+	--scroll-thumb: rgba(18, 22, 47, 0.17);
 
 	--severity-high: #b3374b;
 	--severity-medium: #b3722a;
@@ -63,6 +83,67 @@
 	--paper: #fbf6f8;
 }
 
+/*
+ * Dark.
+ *
+ * Not the light palette inverted. The ground is her own screen colour —
+ * #11162f is the navy her face is made of — so in the dark the page reads as
+ * the same object she is, and she sits in it rather than on it. Ink and paper
+ * swap roles; the accent lifts, because #5b4cb0 on a dark ground is a bruise.
+ *
+ * Keyed on one attribute rather than on the media query as well. The document
+ * carries the *resolved* theme — a small script in the head turns a stored
+ * "system" into light or dark before the first paint, and the app follows the
+ * system afterwards — so the palette is written once instead of twice, and
+ * there is a single place to read for what the page is currently wearing.
+ */
+:root[data-theme='dark'] {
+	--ground: #0e1226;
+	--paper: #181d34;
+	--surface: #212745;
+	--ink: #edeffb;
+	--ink-soft: #c3c8e2;
+	--muted: #8d94b1;
+	--accent: #a396f5;
+	--accent-soft: #262c4e;
+	--line: rgba(206, 214, 255, 0.12);
+	--line-strong: rgba(206, 214, 255, 0.24);
+
+	--severity-high: #f0798c;
+	--severity-medium: #e4a457;
+	--severity-low: #82aed3;
+	--severity-info: #9aa1bd;
+
+	--shadow-card:
+		0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+	--shadow-float: 0 20px 52px -20px rgba(0, 0, 0, 0.7);
+
+	--sky: rgba(120, 132, 214, 0.16);
+	--glow-tint: #2b3160;
+	--cta: var(--accent);
+	--cta-ink: #12152c;
+	--scrim: rgba(3, 5, 14, 0.58);
+	--scrim-strong: rgba(3, 5, 14, 0.68);
+
+	--logo-body: #cdd2ec;
+	--logo-paper: #565d84;
+	--logo-screen: #0d1128;
+	--scroll-thumb: rgba(206, 214, 255, 0.2);
+
+	color-scheme: dark;
+}
+
+:root[data-theme='dark'][data-character='rose'] {
+	--accent: #f191b8;
+	--accent-soft: #3a2233;
+	--ink: #fae9f1;
+	--ink-soft: #dcc3d0;
+	--muted: #ab8e9e;
+	--ground: #150e1b;
+	--paper: #1f1526;
+	--surface: #2b1c33;
+}
+
 html,
 body {
 	height: 100%;
@@ -72,7 +153,7 @@ body {
 	margin: 0;
 	min-width: 320px;
 	background:
-		radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.92), transparent 60%),
+		radial-gradient(120% 70% at 50% -10%, var(--sky), transparent 60%),
 		var(--ground);
 }
 
@@ -95,7 +176,7 @@ button {
 /* A scrollbar that does not fight the paper surfaces. */
 * {
 	scrollbar-width: thin;
-	scrollbar-color: rgba(18, 22, 47, 0.18) transparent;
+	scrollbar-color: var(--scroll-thumb) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -104,7 +185,7 @@ button {
 }
 
 *::-webkit-scrollbar-thumb {
-	background: rgba(18, 22, 47, 0.16);
+	background: var(--scroll-thumb);
 	border: 3px solid transparent;
 	border-radius: 999px;
 	background-clip: content-box;

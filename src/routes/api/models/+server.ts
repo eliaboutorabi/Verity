@@ -27,8 +27,9 @@ export const GET: RequestHandler = async ({ request }) => {
 
 	return json({
 		models: models.length ? models : [DEFAULT_MODEL],
-		// A fast mid-size model is the right default for a conversation that
-		// makes several tool calls a turn; the picker offers the rest.
+		// Luna is the default: a turn here is several tool calls and a citation
+		// that has to be right, which is worth more than the last few hundred
+		// milliseconds. The picker offers everything else the key can reach.
 		defaultModel: models.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : (models[0] ?? DEFAULT_MODEL),
 		realtimeAvailable: new Set(available).has(REALTIME_MODEL)
 	});

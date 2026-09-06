@@ -382,7 +382,7 @@
 	}
 
 	dialog::backdrop {
-		background: color-mix(in srgb, var(--ink) 40%, transparent);
+		background: var(--scrim-strong);
 		backdrop-filter: blur(6px);
 	}
 
@@ -582,7 +582,7 @@
 	}
 
 	.notice[data-tone='error'] {
-		background: color-mix(in srgb, var(--severity-high) 8%, white);
+		background: color-mix(in srgb, var(--severity-high) 12%, var(--surface));
 		color: color-mix(in srgb, var(--severity-high) 80%, black);
 	}
 

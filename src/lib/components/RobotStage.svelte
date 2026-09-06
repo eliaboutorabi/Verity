@@ -365,8 +365,8 @@
 		border-radius: 50%;
 		background: radial-gradient(
 			closest-side,
-			color-mix(in srgb, var(--accent) 22%, white) 0%,
-			color-mix(in srgb, var(--accent) 8%, white) 45%,
+			color-mix(in srgb, var(--accent) 22%, var(--glow-tint)) 0%,
+			color-mix(in srgb, var(--accent) 8%, var(--glow-tint)) 45%,
 			transparent 78%
 		);
 		opacity: 0.5;

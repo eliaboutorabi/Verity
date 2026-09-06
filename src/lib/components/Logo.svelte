@@ -43,15 +43,15 @@
 	}
 
 	.paper {
-		fill: color-mix(in srgb, var(--ink) 12%, white);
+		fill: var(--logo-paper);
 	}
 
 	.body {
-		fill: var(--ink);
+		fill: var(--logo-body);
 	}
 
 	.screen {
-		fill: color-mix(in srgb, var(--ink) 55%, black);
+		fill: var(--logo-screen);
 	}
 
 	.eye {

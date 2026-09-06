@@ -21,7 +21,7 @@ import type { JsonValue } from './schema.js';
 
 const API_BASE = 'https://api.openai.com/v1';
 
-export const DEFAULT_MODEL = 'gpt-5.4-mini';
+export const DEFAULT_MODEL = 'gpt-5.6-luna';
 
 /**
  * Which of a key's models to offer, newest first.

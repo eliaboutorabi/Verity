@@ -48,6 +48,42 @@ test.describe('the key gate', () => {
 	});
 });
 
+test.describe('the theme', () => {
+	test.beforeEach(async ({ page }) => {
+		await page.goto('/');
+		await unlock(page);
+	});
+
+	test('switches, sticks, and survives a reload', async ({ page }) => {
+		// The head script resolved this before anything painted.
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+		await page.getByRole('button', { name: 'Switch to the dark theme' }).click();
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+		const ground = await page.evaluate(() =>
+			getComputedStyle(document.documentElement).getPropertyValue('--ground').trim()
+		);
+		expect(ground).toBe('#0e1226');
+
+		await page.reload();
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+		await expect(page.getByRole('button', { name: 'Switch to the light theme' })).toBeVisible();
+	});
+
+	test('follows the system until someone chooses', async ({ page }) => {
+		await page.emulateMedia({ colorScheme: 'dark' });
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+		await page.emulateMedia({ colorScheme: 'light' });
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+		// Once chosen, the system no longer gets a vote.
+		await page.getByRole('button', { name: 'Switch to the dark theme' }).click();
+		await page.emulateMedia({ colorScheme: 'light' });
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+	});
+});
+
 test.describe('a conversation', () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto('/');

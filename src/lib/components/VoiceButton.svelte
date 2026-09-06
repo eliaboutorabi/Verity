@@ -71,8 +71,8 @@
 		border: 0;
 		border-radius: 999px;
 		padding: 13px 26px 13px 18px;
-		background: var(--ink);
-		color: var(--paper);
+		background: var(--cta);
+		color: var(--cta-ink);
 		font-size: 15px;
 		font-weight: 620;
 		letter-spacing: -0.01em;

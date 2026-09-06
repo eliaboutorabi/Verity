@@ -283,7 +283,7 @@
 	}
 
 	dialog::backdrop {
-		background: color-mix(in srgb, var(--ink) 34%, transparent);
+		background: var(--scrim);
 		backdrop-filter: blur(6px);
 	}
 
@@ -477,7 +477,9 @@
 	}
 
 	textarea {
-		resize: vertical;
+		/* No drag handle. It is a grey triangle that invites the reader to
+		   resize a box that is already the right size. */
+		resize: none;
 		line-height: 1.55;
 	}
 
@@ -651,7 +653,7 @@
 	}
 
 	button.ghost.danger:hover {
-		background: color-mix(in srgb, var(--severity-high) 10%, white);
+		background: color-mix(in srgb, var(--severity-high) 13%, var(--surface));
 		color: var(--severity-high);
 	}
 

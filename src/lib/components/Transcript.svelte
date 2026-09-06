@@ -248,7 +248,7 @@
 	.check[data-state='revised'] {
 		display: flex;
 		color: color-mix(in srgb, var(--severity-medium) 88%, var(--ink));
-		background: color-mix(in srgb, var(--severity-medium) 7%, white);
+		background: color-mix(in srgb, var(--severity-medium) 11%, var(--surface));
 		border-color: color-mix(in srgb, var(--severity-medium) 20%, transparent);
 		max-width: 66ch;
 		align-items: flex-start;
@@ -335,7 +335,7 @@
 		padding: 10px 14px;
 		font-size: 13.5px;
 		line-height: 1.5;
-		background: color-mix(in srgb, var(--severity-high) 8%, white);
+		background: color-mix(in srgb, var(--severity-high) 12%, var(--surface));
 		border: 1px solid color-mix(in srgb, var(--severity-high) 22%, transparent);
 		color: color-mix(in srgb, var(--severity-high) 80%, black);
 	}
