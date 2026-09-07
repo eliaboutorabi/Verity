@@ -505,6 +505,17 @@
 		color: var(--accent);
 	}
 
+	/*
+	 * A column of pages, in flex rather than grid.
+	 *
+	 * Each page sizes itself from an `aspect-ratio` and a width that depends on
+	 * the container. Grid resolves a row's height before that width is known, so
+	 * every page got a row several hundred pixels shorter than the page itself
+	 * and the next one started on top of it — page one truncated mid-clause,
+	 * page two overlapping it, and a third of the highlights hidden underneath.
+	 * Flex sizes the item first and the line after it, which is the order this
+	 * needs.
+	 */
 	.scroller {
 		flex: 1;
 		min-height: 0;
@@ -512,15 +523,18 @@
 		overscroll-behavior: contain;
 		background: color-mix(in srgb, var(--ink) 5%, var(--paper));
 		padding: 18px;
-		display: grid;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
 		gap: 18px;
-		justify-items: center;
 	}
 
 	.page {
 		position: relative;
 		width: 100%;
 		max-width: 720px;
+		/* Never squashed to share the column with its neighbours. */
+		flex: none;
 		background: white;
 		border-radius: 6px;
 		box-shadow: 0 1px 2px rgba(18, 22, 47, 0.1), 0 10px 30px -18px rgba(18, 22, 47, 0.5);

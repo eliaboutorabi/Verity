@@ -169,9 +169,33 @@ test.describe('a conversation', () => {
 
 		// Marking a document with no way to see it is the same as not marking it.
 		await expect(page.locator('.chip-marks')).toHaveText('1 marked');
+		// A grid item's default min-width refuses to shrink below its contents, so
+		// a row whose text will not wrap used to push out through the side of the
+		// card. Everything inside is prepared to be clamped; the item has to let it.
+		const overflow = await page.locator('.marks button').first().evaluate((el) => ({
+			scroll: el.scrollWidth,
+			client: el.clientWidth,
+			cardRight: el.closest('article.card')!.getBoundingClientRect().right,
+			rowRight: el.getBoundingClientRect().right
+		}));
+		expect(overflow.scroll).toBeLessThanOrEqual(overflow.client);
+		expect(overflow.rowRight).toBeLessThanOrEqual(overflow.cardRight);
+
 		await page.getByRole('button', { name: 'Open the document' }).click();
 		await expect(page.locator('dialog[open]')).toBeVisible();
 		await expect(page.locator('dialog[open]')).toContainText('engagement-letter-brightline.pdf');
+
+		// Each page sizes itself from an aspect ratio, and a grid resolves a row's
+		// height before that width is known — so every page got a row hundreds of
+		// pixels shorter than itself and the next one landed on top of it.
+		await expect(page.locator('dialog[open] .page')).toHaveCount(2);
+		const stacked = await page.locator('dialog[open] .page').evaluateAll((els) =>
+			els.map((el) => {
+				const box = el.getBoundingClientRect();
+				return { top: box.top, bottom: box.bottom };
+			})
+		);
+		expect(stacked[1].top).toBeGreaterThanOrEqual(stacked[0].bottom);
 	});
 
 	test('a multiple-choice question is answered by clicking', async ({ page }) => {

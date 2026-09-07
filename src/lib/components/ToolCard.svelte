@@ -664,8 +664,16 @@
 		gap: 6px;
 	}
 
+	/*
+	 * A grid item's default `min-width: auto` refuses to shrink below its own
+	 * min-content, so a row whose text will not wrap pushes itself wider than
+	 * the track and out through the side of the card. Everything inside is
+	 * already prepared to be clamped — the quote ellipsises — but nothing gets
+	 * the chance until the item is allowed to be narrower than its contents.
+	 */
 	.marks li {
 		padding: 0;
+		min-width: 0;
 	}
 
 	.marks button {
