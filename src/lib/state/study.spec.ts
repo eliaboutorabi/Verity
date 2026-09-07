@@ -9,6 +9,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { study } from './study.svelte.js';
+import { withoutInlineChoices } from '$lib/plugins/study.js';
 
 const question = (id: string, hints = ['First nudge', 'Second nudge']) => ({
 	id,
@@ -91,5 +92,33 @@ describe('the exam', () => {
 		expect(study.revealAnswer()).toBeNull();
 		expect(() => study.score('correct', 'nothing to mark')).not.toThrow();
 		expect(study.isEmpty).toBe(true);
+	});
+});
+
+describe('a question that lists its own options', () => {
+	const choices = [{ label: 'A' }, { label: 'B' }, { label: 'C' }, { label: 'D' }];
+
+	it('keeps the question and drops the options out of it', () => {
+		const prompt =
+			'Maya owns a rental property that produces a $30,000 loss. Which statement is correct? ' +
+			'A. It offsets her wages. B. It is passive and suspended. C. It is never deductible. ' +
+			'D. It offsets portfolio income.';
+
+		expect(withoutInlineChoices(prompt, choices)).toBe(
+			'Maya owns a rental property that produces a $30,000 loss. Which statement is correct?'
+		);
+	});
+
+	it('leaves an open question alone', () => {
+		const prompt = 'What has to be substantiated for a travel deduction, and in what form?';
+		expect(withoutInlineChoices(prompt, choices)).toBe(prompt);
+		expect(withoutInlineChoices(prompt, undefined)).toBe(prompt);
+	});
+
+	it('does not maul a sentence that happens to contain a letter and a stop', () => {
+		// "A." here is the start of the question, not the start of a list — and
+		// there is no "B." following it.
+		const prompt = 'A. Corp elects S status mid-year. When does the election take effect?';
+		expect(withoutInlineChoices(prompt, choices)).toBe(prompt);
 	});
 });

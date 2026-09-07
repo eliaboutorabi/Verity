@@ -46,6 +46,31 @@ const VERDICTS = ['correct', 'partly', 'incorrect'] as const;
 
 let counter = 0;
 
+/**
+ * Cut the options back out of the question text.
+ *
+ * Asked for a question and a set of choices, she reliably writes the options
+ * into both — so the card shows "…which is correct? A. … B. … C. … D. …" and
+ * then lists A to D again underneath as buttons. Telling her not to helps; this
+ * is what makes it not happen. Finds where the first option label starts, on
+ * the evidence that the second one follows it, and keeps only what came before.
+ */
+export function withoutInlineChoices(
+	prompt: string,
+	choices?: { label: string }[]
+): string {
+	if (!choices || choices.length < 2) return prompt;
+	const [first, second] = choices.map((choice) => choice.label.replace(/[^A-Za-z0-9]/g, ''));
+	if (!first || !second) return prompt;
+
+	const inline = new RegExp(`\\s*\\b${first}[.)]\\s[\\s\\S]*?\\b${second}[.)]\\s`);
+	const match = inline.exec(prompt);
+	// Only past the opening: a question that genuinely starts with "A." is not
+	// a list of options, it is a sentence.
+	if (!match || match.index < 20) return prompt;
+	return prompt.slice(0, match.index).trim();
+}
+
 /** Questions are identified across a session; the id is what a reveal targets. */
 function nextQuestionId(): string {
 	counter += 1;
@@ -259,7 +284,7 @@ export const studyPlugin = {
 						type: 'string',
 						required: true,
 						description:
-							'The question itself. For anything above recall, give the facts first and then ask.'
+							'The question itself. For anything above recall, give the facts first and then ask. Do not write the options into it — they go in `choices` and the screen lays them out.'
 					},
 					choices: {
 						type: 'array',
@@ -351,7 +376,10 @@ export const studyPlugin = {
 					area: args.area,
 					topic: args.topic.trim().slice(0, 90),
 					skill: args.skill,
-					prompt: args.question.trim().slice(0, 1200),
+					prompt: withoutInlineChoices(
+						args.question.trim(),
+						args.choices?.map((choice) => ({ label: choice.label.trim() }))
+					).slice(0, 1200),
 					choices: args.choices?.slice(0, 6).map((choice) => ({
 						label: choice.label.trim().slice(0, 4),
 						text: choice.text.trim().slice(0, 300)

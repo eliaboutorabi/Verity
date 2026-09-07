@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { GOOD_KEY, stubApi, unlock } from './fixtures.js';
+import { GOOD_KEY, questionStream, stubApi, unlock } from './fixtures.js';
 
 // Each test gets a fresh browser context, so local storage starts empty
 // without an init script — which would otherwise also wipe the key the
@@ -137,6 +137,41 @@ test.describe('a conversation', () => {
 	test('a starter card starts a turn', async ({ page }) => {
 		await page.getByRole('button', { name: /Look up a rule/ }).click();
 		await expect(page.locator('article.card')).toBeVisible();
+	});
+
+	test('an attachment on its own is a message', async ({ page }) => {
+		const send = page.getByRole('button', { name: 'Send message' });
+		await expect(send).toBeDisabled();
+
+		// Attaching a document and pressing send means "look at this", which is
+		// what anybody doing it intends — the box does not also need a sentence.
+		await page.getByRole('button', { name: 'Engagement letter' }).click();
+		await expect(page.locator('.chips li')).toHaveCount(1);
+		await expect(send).toBeEnabled();
+
+		await send.click();
+		await expect(page.locator('.bubble')).toHaveText('Take a look at this.');
+	});
+
+	test('a multiple-choice question is answered by clicking', async ({ page }) => {
+		await page.route('**/api/chat', async (route) => {
+			await route.fulfill({
+				status: 200,
+				headers: { 'Content-Type': 'text/event-stream' },
+				body: questionStream()
+			});
+		});
+
+		await page.getByLabel('Message Verity').fill('Quiz me.');
+		await page.getByRole('button', { name: 'Send message' }).click();
+
+		const choices = page.locator('.choices button');
+		await expect(choices).toHaveCount(2);
+
+		// Reading four options and then typing "B" is work the screen should do.
+		await choices.nth(1).click();
+		await expect(page.locator('.bubble').last()).toContainText('B —');
+		await expect(choices.nth(1)).toHaveClass(/picked/);
 	});
 
 	test('the icon on a starter animates when the card is hovered', async ({ page }) => {

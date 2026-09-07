@@ -73,6 +73,18 @@ practice, folded into the prompt as background rather than instruction — and
 a skill off withholds those tools rather than politely asking her not to use
 them.
 
+**Or just listen.** Talking to her and hearing her are separate wants, so
+there are two buttons: the microphone starts a conversation, and the headphones
+start the same session with your microphone off. Nobody should have to open a
+microphone to have a paragraph read out.
+
+**Without the wall of words.** During a spoken conversation the running
+transcript is off. It writes itself into the thread as she talks, and every line
+scrolls the view off whatever she has just put on screen — which, mid-exam, is
+the question you are reading. The cards stay either way; those are the moments
+she chose to show you something. A button next to the microphone brings the
+transcript back.
+
 **Or just type.** Voice and text share one transcript, one tool registry and one
 set of cards. You can start by typing, switch to speaking, and keep one thread —
 and typing during a live voice session joins the conversation rather than

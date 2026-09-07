@@ -10,12 +10,28 @@
 
 	let {
 		onshow,
-		onsend
+		onsend,
+		spoken = true
 	}: {
 		onshow?: (documentId: string, quote: string) => void;
 		/** Ask her something on the reader's behalf, from inside a card. */
 		onsend?: (text: string) => void;
+		/**
+		 * Whether what was said belongs on screen.
+		 *
+		 * Off during a voice conversation unless it is asked for. The words
+		 * arrive continuously and each one scrolls the view, which pulls the
+		 * page off whatever she has just put on it. What she chose to *show* —
+		 * a question, a lesson, a section she read — stays either way.
+		 */
+		spoken?: boolean;
 	} = $props();
+
+	const entries = $derived(
+		spoken
+			? conversation.entries
+			: conversation.entries.filter((entry) => entry.kind === 'tool' || entry.kind === 'notice')
+	);
 
 	let scroller = $state<HTMLDivElement | null>(null);
 	let pinned = $state(true);
@@ -32,8 +48,8 @@
 
 	$effect(() => {
 		// Touching the entries makes this re-run as the turn streams in.
-		conversation.entries.length;
-		const last = conversation.entries.at(-1);
+		entries.length;
+		const last = entries.at(-1);
 		if (last?.kind === 'assistant') last.text.length;
 		if (!pinned || !scroller) return;
 		scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
@@ -42,7 +58,7 @@
 
 <div class="scroller fade-edges" class:scrolled bind:this={scroller} onscroll={onScroll}>
 	<div class="thread">
-		{#each conversation.entries as entry (entry.id)}
+		{#each entries as entry (entry.id)}
 			{#if entry.kind === 'user'}
 				<div class="row user">
 					<p class="bubble">{entry.text}</p>

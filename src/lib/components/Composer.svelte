@@ -27,6 +27,8 @@
 		onsend: (text: string) => void;
 		onstop?: () => void;
 		onopen?: (id: string) => void;
+		/** Documents just attached, by name. */
+		onattach?: (names: string[]) => void;
 	}
 
 	let {
@@ -35,7 +37,8 @@
 		busy = false,
 		onsend,
 		onstop,
-		onopen
+		onopen,
+		onattach
 	}: Props = $props();
 
 	let value = $state('');
@@ -45,7 +48,19 @@
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
 
-	const canSend = $derived(value.trim().length > 0 && !disabled);
+	/**
+	 * What "send" means with an empty box and a file attached.
+	 *
+	 * It means "look at this", which is what anyone attaching a document and
+	 * pressing send intends. Requiring a sentence first made the send button
+	 * dead at exactly the moment the app had the most to say, so an attachment
+	 * nobody has mentioned yet is enough on its own.
+	 */
+	const ATTACHMENT_ONLY = 'Take a look at this.';
+
+	const canSend = $derived(
+		(value.trim().length > 0 || documents.pending.length > 0) && !disabled
+	);
 
 	function autosize() {
 		if (!field) return;
@@ -55,7 +70,7 @@
 
 	function submit() {
 		if (!canSend) return;
-		onsend(value.trim());
+		onsend(value.trim() || ATTACHMENT_ONLY);
 		value = '';
 		queueMicrotask(autosize);
 	}
@@ -70,6 +85,7 @@
 	async function ingest(files: FileList | File[]) {
 		problem = null;
 		reading = true;
+		const attached: string[] = [];
 		try {
 			for (const file of Array.from(files)) {
 				if (!isSupportedDocument(file)) {
@@ -81,13 +97,18 @@
 					problem = `${file.name} had no readable text.`;
 					continue;
 				}
-				documents.add(file.name, text, 'file', file);
+				const added = documents.add(file.name, text, 'file', file);
+				if (added) attached.push(added.name);
 			}
 		} catch (cause) {
 			problem = cause instanceof Error ? cause.message : 'That file could not be read.';
 		} finally {
 			reading = false;
 			if (picker) picker.value = '';
+			// The page decides what to do about it — in a live voice session,
+			// something arriving on screen that she has not been told about is
+			// worse than useless.
+			if (attached.length) onattach?.(attached);
 		}
 	}
 

@@ -37,6 +37,41 @@ const SEARCH_VIEW = {
 	]
 };
 
+const QUESTION_VIEW = {
+	card: 'question',
+	title: 'Passive activity losses',
+	question: {
+		id: 'q1',
+		area: 'Individuals',
+		topic: 'Passive activity losses',
+		skill: 'application',
+		prompt: 'A taxpayer has a $12,000 rental loss and $8,000 of passive income. What happens?',
+		choices: [
+			{ label: 'A', text: 'All $12,000 is deductible.' },
+			{ label: 'B', text: '$8,000 is absorbed and $4,000 is suspended.' }
+		],
+		hints: ['Net the passive loss against passive income first.'],
+		answer: 'B. The $8,000 of passive income absorbs $8,000 of the loss.',
+		citation: '26 CFR § 1.469-2'
+	}
+};
+
+/** One agent turn that puts a question on screen and waits. */
+export function questionStream(): string {
+	return [
+		{
+			type: 'tool-call',
+			callId: 'q1',
+			name: 'ask_question',
+			label: 'Asking a question'
+		},
+		{ type: 'tool-result', callId: 'q1', name: 'ask_question', isError: false, view: QUESTION_VIEW, durationMs: 90 },
+		{ type: 'done' }
+	]
+		.map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
+		.join('');
+}
+
 /** One agent turn: a tool call, its result, then prose. */
 function chatStream(): string {
 	const frames = [

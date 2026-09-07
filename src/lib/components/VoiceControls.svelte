@@ -2,18 +2,31 @@
 	/**
 	 * The voice controls.
 	 *
-	 * One round button when she is not listening, two when she is. Before this
-	 * there was a single wide pill reading "Talk to Verity", which said the
-	 * obvious thing at the loudest volume on the page and left no room for the
-	 * control that was actually missing: a way to stop her hearing the room.
-	 * Ending the call and going quiet for a minute to think are different
-	 * intentions, and they need different buttons.
+	 * Two round buttons when nothing is running, three when something is.
 	 *
-	 * State lives in the caption rather than in the label, so the buttons stay
-	 * the same size and in the same place whatever she is doing — nothing jumps
-	 * under the pointer mid-conversation.
+	 * The two are the two separate wants. **Talk** is a conversation: she hears
+	 * the room and answers. **Listen** is not — it is the same session with the
+	 * microphone off, for someone who would rather hear an answer than read one
+	 * and has no intention of speaking. Before this the only way to get her
+	 * voice was to open a microphone, which is a trade nobody should have to
+	 * make to hear a paragraph read out.
+	 *
+	 * The three are mute, transcript and end. Transcript is off by default: a
+	 * spoken conversation writes itself into the thread as it goes, and the
+	 * scrolling drags the screen out from under whatever she has just put on it.
+	 * The cards stay either way — those are the times she has something to show.
+	 *
+	 * State lives in the caption rather than in the labels, so the buttons keep
+	 * their size and their place whatever she is doing.
 	 */
-	import { CallEnd01Icon, Mic01Icon, MicOff01Icon } from '@hugeicons/core-free-icons';
+	import {
+		CallEnd01Icon,
+		CaptionsIcon,
+		CaptionsOffIcon,
+		HeadphonesIcon,
+		Mic01Icon,
+		MicOff01Icon
+	} from '@hugeicons/core-free-icons';
 	import Icon from './Icon.svelte';
 	import type { VoiceStatus } from '$lib/client/voice';
 
@@ -21,35 +34,41 @@
 		status: VoiceStatus;
 		active: boolean;
 		muted?: boolean;
+		transcript?: boolean;
 		/** Her own output level, for the ring that breathes while she talks. */
 		level?: number;
 		disabled?: boolean;
 		/** Reason she cannot be started, shown in place of the state. */
 		unavailable?: string;
 		onstart: () => void;
+		onlisten: () => void;
 		onend: () => void;
 		onmute: () => void;
+		ontranscript: () => void;
 	}
 
 	let {
 		status,
 		active,
 		muted = false,
+		transcript = false,
 		level = 0,
 		disabled = false,
 		unavailable,
 		onstart,
+		onlisten,
 		onend,
-		onmute
+		onmute,
+		ontranscript
 	}: Props = $props();
 
 	const caption = $derived(
 		unavailable
 			? unavailable
 			: !active
-				? 'Talk to her'
+				? 'Talk, or just listen'
 				: muted
-					? 'Muted — she cannot hear you'
+					? 'Listening only — she cannot hear you'
 					: status === 'connecting'
 						? 'Connecting…'
 						: status === 'thinking'
@@ -76,6 +95,17 @@
 			>
 				<Icon icon={muted ? MicOff01Icon : Mic01Icon} size={19} />
 			</button>
+			<button
+				class="round"
+				class:lit={transcript}
+				type="button"
+				onclick={ontranscript}
+				aria-pressed={transcript}
+				aria-label={transcript ? 'Hide the running transcript' : 'Show the running transcript'}
+				title={transcript ? 'Hide the transcript' : 'Show the transcript'}
+			>
+				<Icon icon={transcript ? CaptionsIcon : CaptionsOffIcon} size={19} />
+			</button>
 			<button class="round end" type="button" onclick={onend} aria-label="End the voice conversation">
 				<Icon icon={CallEnd01Icon} size={19} />
 			</button>
@@ -86,9 +116,20 @@
 				onclick={onstart}
 				{disabled}
 				aria-label="Start a voice conversation"
+				title="Talk to her"
 			>
 				<span class="halo" aria-hidden="true" style="--ring: {ring}"></span>
 				<Icon icon={Mic01Icon} size={21} />
+			</button>
+			<button
+				class="round"
+				type="button"
+				onclick={onlisten}
+				{disabled}
+				aria-label="Listen without speaking"
+				title="Listen — your microphone stays off"
+			>
+				<Icon icon={HeadphonesIcon} size={19} />
 			</button>
 		{/if}
 	</div>
@@ -105,6 +146,7 @@
 
 	.buttons {
 		display: flex;
+		align-items: center;
 		gap: 10px;
 	}
 
@@ -126,7 +168,8 @@
 			border-color 200ms var(--ease);
 	}
 
-	.round:hover:not(:disabled) {
+	.round:hover:not(:disabled),
+	.round:focus-visible {
 		transform: translateY(-1px);
 		border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
 		color: var(--ink);
@@ -155,6 +198,12 @@
 		background: color-mix(in srgb, var(--severity-high) 18%, var(--surface));
 		border-color: color-mix(in srgb, var(--severity-high) 55%, transparent);
 		color: var(--severity-high);
+	}
+
+	.round.lit {
+		background: var(--accent-soft);
+		border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+		color: var(--accent);
 	}
 
 	.end:hover {

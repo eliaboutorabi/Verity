@@ -59,6 +59,15 @@
 	let audioLevel = $state(0);
 	let mouth = $state<MouthPose>(MOUTH_AT_REST);
 	let voiceMuted = $state(false);
+	/**
+	 * Whether the running transcript is in the thread.
+	 *
+	 * Off while she is speaking. A spoken conversation writes itself down as it
+	 * goes, and the scrolling pulls the view off whatever she has just put on
+	 * screen — which, during an exam, is the question you are trying to read.
+	 * Cards are unaffected: those are the moments she has something to show.
+	 */
+	let transcriptOpen = $state(false);
 	let audible = $state(false);
 	let starting = $state(false);
 
@@ -253,9 +262,16 @@
 		voice.stop();
 		voiceActive = false;
 		voiceMuted = false;
+		// The thread is the whole interface again once nobody is talking.
+		transcriptOpen = false;
 	}
 
-	async function toggleVoice() {
+	/** Her voice, without opening a microphone. */
+	function listen() {
+		return toggleVoice({ muted: true });
+	}
+
+	async function toggleVoice(options: { muted?: boolean } = {}) {
 		if (voice.active) {
 			endVoice();
 			return;
@@ -267,6 +283,7 @@
 				character: session.character,
 				documents: documents.payload(),
 				brain: brain.payload(),
+				muted: options.muted,
 				// Only greet a cold start; mid-conversation, just start listening.
 				greet: conversation.isEmpty
 			});
@@ -297,6 +314,10 @@
 	}
 
 	async function send(text: string) {
+		// Whatever carries the turn carries the documents with it, so anything
+		// attached has now been mentioned.
+		documents.markMentioned();
+
 		// Typing into a live voice session joins the conversation already running
 		// rather than starting a competing one.
 		if (voice.active && voice.say(text)) {
@@ -481,6 +502,29 @@
 
 	let loadingSample = $state<string | null>(null);
 
+	/**
+	 * A document arrived while she was talking.
+	 *
+	 * A live session was given its documents once, at connect time, and never
+	 * again — so attaching a file mid-call put a chip on screen and changed
+	 * nothing at all on her side. The session's set is kept current, and she is
+	 * told, because a file appearing silently is worse than one that never
+	 * arrived: the user can see it and reasonably assumes she can too.
+	 */
+	function announceDocuments(names: string[]) {
+		if (!voice.active || !names.length) return;
+		voice.setDocuments(documents.payload());
+		const list =
+			names.length === 1
+				? names[0]
+				: `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+		const said = `I have just attached ${list}.`;
+		if (voice.say(said)) {
+			conversation.addUser(said, 'voice');
+			documents.markMentioned();
+		}
+	}
+
 	/** Load the engagement letter and set her on it, in one press. */
 	async function reviewSample() {
 		await loadSample(SAMPLES[2]);
@@ -494,6 +538,7 @@
 			if (!response.ok) throw new Error('That sample could not be fetched.');
 			const file = new File([await response.blob()], sample.file, { type: 'application/pdf' });
 			documents.add(sample.file, await extractText(file), 'file', file);
+			announceDocuments([sample.name]);
 		} catch (cause) {
 			conversation.addNotice(
 				cause instanceof Error ? cause.message : 'That sample could not be loaded.'
@@ -582,6 +627,7 @@
 					status={voiceStatus}
 					active={voiceActive}
 					muted={voiceMuted}
+					transcript={transcriptOpen}
 					level={audioLevel}
 					disabled={!unlocked || starting || !session.realtimeAvailable}
 					unavailable={!unlocked
@@ -589,9 +635,11 @@
 						: !session.realtimeAvailable
 							? 'Voice needs Realtime access on this key'
 							: undefined}
-					onstart={toggleVoice}
+					onstart={() => toggleVoice()}
+					onlisten={listen}
 					onend={endVoice}
 					onmute={toggleMute}
+					ontranscript={() => (transcriptOpen = !transcriptOpen)}
 				/>
 			</div>
 
@@ -645,7 +693,11 @@
 							</p>
 						</div>
 					{:else}
-						<Transcript onshow={showOnPage} onsend={send} />
+						<Transcript
+							onshow={showOnPage}
+							onsend={send}
+							spoken={!voiceActive || transcriptOpen}
+						/>
 					{/if}
 				</div>
 
@@ -669,10 +721,15 @@
 						bind:this={composer}
 						busy={textBusy}
 						disabled={textBusy}
-						placeholder={voiceActive ? 'Type while you talk…' : 'Ask about a regulation…'}
+						placeholder={!voiceActive
+							? 'Ask about a regulation…'
+							: voiceMuted
+								? 'Type while she talks…'
+								: 'Type while you talk…'}
 						onsend={send}
 						onstop={stopTurn}
 						onopen={(id) => (viewing = id)}
+						onattach={announceDocuments}
 					/>
 				</div>
 			{/if}

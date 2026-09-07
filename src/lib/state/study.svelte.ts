@@ -20,6 +20,8 @@ export interface AskedQuestion extends ExamQuestion {
 	answerShown: boolean;
 	verdict?: 'correct' | 'partly' | 'incorrect';
 	feedback?: string;
+	/** The option they clicked, if it was multiple choice. */
+	chosen?: string;
 	askedAt: number;
 }
 
@@ -58,6 +60,12 @@ class StudyState {
 	ask(question: ExamQuestion): void {
 		if (this.asked.some((existing) => existing.id === question.id)) return;
 		this.asked.push({ ...question, hintsShown: 0, answerShown: false, askedAt: Date.now() });
+	}
+
+	/** They picked an option. Recorded so the card can show which. */
+	choose(label: string, id = this.current?.id): void {
+		const question = id ? this.byId(id) : undefined;
+		if (question && question.verdict === undefined) question.chosen = label;
 	}
 
 	byId(id: string): AskedQuestion | undefined {

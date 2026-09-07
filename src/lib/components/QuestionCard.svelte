@@ -31,6 +31,20 @@
 		question ? question.hints.length - question.hintsShown : 0
 	);
 
+	/**
+	 * Pick an option.
+	 *
+	 * Reading four options and then typing "B" is work the screen should be
+	 * doing. The click records the choice locally so the card can show which one
+	 * was pressed, and sends it as a message like any other answer — so the same
+	 * marking happens whether it was clicked or spoken.
+	 */
+	function answer(choice: { label: string; text: string }) {
+		if (!onsend || !question || question.verdict !== undefined) return;
+		study.choose(choice.label, question.id);
+		onsend(`${choice.label} — ${choice.text}`);
+	}
+
 	const SKILL_LABEL: Record<string, string> = {
 		recall: 'Recall',
 		application: 'Application',
@@ -56,7 +70,17 @@
 		{#if question.choices?.length}
 			<ol class="choices">
 				{#each question.choices as choice (choice.label)}
-					<li><span class="letter">{choice.label}</span>{choice.text}</li>
+					<li>
+						<button
+							type="button"
+							class:picked={question.chosen === choice.label}
+							disabled={!onsend || question.verdict !== undefined}
+							onclick={() => answer(choice)}
+						>
+							<span class="letter">{choice.label}</span>
+							<span>{choice.text}</span>
+						</button>
+					</li>
 				{/each}
 			</ol>
 		{/if}
@@ -177,17 +201,43 @@
 		gap: 7px;
 	}
 
-	.choices li {
+	.choices button {
 		display: grid;
 		grid-template-columns: auto minmax(0, 1fr);
 		gap: 10px;
 		align-items: baseline;
+		width: 100%;
+		text-align: left;
 		padding: 9px 12px;
 		border: 1px solid var(--line);
 		border-radius: 11px;
+		background: none;
+		font: inherit;
 		font-size: 14.5px;
 		line-height: 1.45;
 		color: var(--ink-soft);
+		cursor: pointer;
+		transition:
+			border-color 160ms var(--ease),
+			background 160ms var(--ease),
+			color 160ms var(--ease);
+	}
+
+	.choices button:hover:not(:disabled) {
+		border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+		background: var(--accent-soft);
+		color: var(--ink);
+	}
+
+	.choices button:disabled {
+		cursor: default;
+	}
+
+	/* Which one they pressed, still legible once it has been marked. */
+	.choices button.picked {
+		border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+		background: var(--accent-soft);
+		color: var(--ink);
 	}
 
 	.letter {

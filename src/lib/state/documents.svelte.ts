@@ -15,6 +15,15 @@ export interface LoadedDocument extends StoredDocument {
 	/** Object URL for the viewer; created lazily and revoked on removal. */
 	objectUrl?: string;
 	mimeType?: string;
+	/**
+	 * Whether she has been told this exists.
+	 *
+	 * Attaching a file and attaching a file *she knows about* are different
+	 * events, and the difference decides two things: whether pressing send with
+	 * an empty box means anything, and whether a live voice session needs to be
+	 * told something just arrived. A document is pending until a turn carries it.
+	 */
+	mentioned?: boolean;
 }
 
 let counter = 0;
@@ -23,6 +32,8 @@ class DocumentState {
 	items = $state<LoadedDocument[]>([]);
 
 	readonly total = $derived(this.items.length);
+	/** Attached, but she has not been told yet. */
+	readonly pending = $derived(this.items.filter((item) => !item.mentioned));
 	readonly characters = $derived(this.items.reduce((sum, item) => sum + item.text.length, 0));
 
 	add(
@@ -44,6 +55,11 @@ class DocumentState {
 		};
 		this.items.push(document);
 		return document;
+	}
+
+	/** She has now been told about everything attached. */
+	markMentioned(): void {
+		for (const item of this.items) item.mentioned = true;
 	}
 
 	get(id: string): LoadedDocument | undefined {

@@ -78,6 +78,15 @@ export interface VoiceStartOptions {
 	documents: StoredDocument[];
 	/** Speak an opening line without waiting for the user. */
 	greet?: boolean;
+	/**
+	 * Start with the microphone off.
+	 *
+	 * Listening and talking are separate wants. Someone who would rather hear
+	 * the answer than read it does not necessarily want a machine hearing their
+	 * room, and making them start a conversation to get a voice is the wrong
+	 * trade. Muted is a whole mode, not an accident.
+	 */
+	muted?: boolean;
 	/** Knowledge, skills and the tool packs those skills need. */
 	brain?: unknown;
 }
@@ -167,6 +176,7 @@ export class VoiceSession {
 	async start(options: VoiceStartOptions): Promise<void> {
 		if (this.#pc) return;
 		this.#documents = options.documents;
+		this.#muted = options.muted ?? false;
 		this.#brain = options.brain;
 		this.#setStatus('connecting');
 
