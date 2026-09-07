@@ -76,7 +76,11 @@ export interface VoiceStartOptions {
 	apiKey: string;
 	character: CharacterId;
 	documents: StoredDocument[];
-	/** Speak an opening line without waiting for the user. */
+	/**
+	 * Speak an opening line without waiting for the user.
+	 *
+	 * Ignored on a muted start, which is not a conversation yet.
+	 */
 	greet?: boolean;
 	/**
 	 * Start with the microphone off.
@@ -84,7 +88,8 @@ export interface VoiceStartOptions {
 	 * Listening and talking are separate wants. Someone who would rather hear
 	 * the answer than read it does not necessarily want a machine hearing their
 	 * room, and making them start a conversation to get a voice is the wrong
-	 * trade. Muted is a whole mode, not an accident.
+	 * trade. Muted is a whole mode, not an accident — so it also suppresses the
+	 * greeting: she waits, and says nothing until she is asked something.
 	 */
 	muted?: boolean;
 	/** Knowledge, skills and the tool packs those skills need. */
@@ -206,7 +211,10 @@ export class VoiceSession {
 			channel.addEventListener('open', () => {
 				this.#setStatus('listening');
 				this.#seedHistory(this.handlers.transcript?.() ?? []);
-				if (options.greet) this.#requestGreeting();
+				// Never on a muted start. Greeting is the opening move of a
+				// conversation, and someone who opened this to listen has not
+				// started one — she would be answering a question nobody asked.
+				if (options.greet && !this.#muted) this.#requestGreeting();
 			});
 			channel.addEventListener('message', (message) => {
 				try {
@@ -396,8 +404,23 @@ export class VoiceSession {
 		}
 	}
 
+	/**
+	 * Say hello, and only hello.
+	 *
+	 * A bare `response.create` with nothing in context leaves her to invent a
+	 * turn out of the system prompt — which is mostly research discipline, so
+	 * she opened with "let me pull the current rule and any recent changes",
+	 * narrating a lookup for a question nobody had asked. The greeting has to
+	 * say that it is a greeting.
+	 */
 	#requestGreeting(): void {
-		this.#send({ type: 'response.create' });
+		this.#send({
+			type: 'response.create',
+			response: {
+				instructions:
+					'Greet them in one short sentence and ask what they are looking at. Do not call any tool, do not describe what you are about to do, and do not answer anything — nobody has asked you a question yet.'
+			}
+		});
 	}
 
 	#send(payload: unknown): void {
