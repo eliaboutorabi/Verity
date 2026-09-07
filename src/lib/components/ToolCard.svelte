@@ -55,7 +55,7 @@
 		// Both land in the question card above, which is where anyone is looking.
 		reveal: false,
 		verdict: false,
-		error: true,
+		error: false,
 		generic: false
 	};
 
@@ -102,7 +102,7 @@
 		}
 	});
 
-	const collapsible = $derived(entry.state !== 'running' && result?.card !== 'error');
+	const collapsible = $derived(entry.state !== 'running');
 
 	const REGULATION_PREVIEW = 900;
 
@@ -158,7 +158,7 @@
 		<div class="head">{@render head()}</div>
 	{/if}
 
-	{#if open || entry.state === 'running' || result?.card === 'error'}
+	{#if open || entry.state === 'running'}
 	<div class="body-slot">
 
 	{#if entry.state === 'running'}
@@ -395,9 +395,14 @@
 		animation: breathe 1.5s ease-in-out infinite;
 	}
 
+	/*
+	 * Identifiable, not alarming. A tool she asked the wrong way and then asked
+	 * again correctly is a step in the loop, and colouring it like a failure
+	 * makes three of them look like the app is coming apart.
+	 */
 	[data-state='error'] .glyph {
-		background: color-mix(in srgb, var(--severity-high) 14%, var(--surface));
-		color: var(--severity-high);
+		background: color-mix(in srgb, var(--severity-medium) 12%, var(--surface));
+		color: var(--severity-medium);
 	}
 
 	@keyframes breathe {

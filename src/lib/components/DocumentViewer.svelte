@@ -195,7 +195,17 @@
 	 * overlay is correct at any zoom without recomputing anything.
 	 */
 	interface Marker {
+		/** The highlight this belongs to; several markers can share one. */
 		id: string;
+		/**
+		 * Unique per marker, which `id` is not.
+		 *
+		 * A quote that spans a paragraph break legitimately draws two boxes on
+		 * the same page, and keying an each block by highlight and page put the
+		 * same key on both — which throws mid-render and aborts the DOM flush,
+		 * so the whole page stops responding rather than one box going missing.
+		 */
+		key: string;
 		page: number;
 		left: number;
 		top: number;
@@ -205,6 +215,16 @@
 		severity: string;
 		quote: string;
 	}
+
+	/**
+	 * The most of a page one mark may cover.
+	 *
+	 * A box past this is not pointing at a passage, it is shading the page —
+	 * which happens when a quote fails to match exactly and falls through to a
+	 * proportional estimate of a block that turned out to be enormous. Dropping
+	 * it loses one mark; drawing it makes the reader distrust all of them.
+	 */
+	const MAX_MARK_HEIGHT = 34;
 
 	const markers = $derived.by<Marker[]>(() => {
 		if (!ocrPages.length) return [];
@@ -221,6 +241,7 @@
 				if (!box) continue;
 				found.push({
 					id: highlight.id,
+					key: `${highlight.id}:${found.length}`,
 					page: page.index,
 					left: (box.x / page.width) * 100,
 					top: (box.y / page.height) * 100,
@@ -238,8 +259,10 @@
 			for (const match of reader.locate(highlight)) {
 				const page = ocrPages.find((candidate) => candidate.index === match.page);
 				if (!page?.width || !page?.height) continue;
+				if ((match.box.height / page.height) * 100 > MAX_MARK_HEIGHT) continue;
 				found.push({
 					id: highlight.id,
+					key: `${highlight.id}:${found.length}`,
 					page: match.page,
 					left: (match.box.x / page.width) * 100,
 					top: (match.box.y / page.height) * 100,
@@ -348,7 +371,7 @@
 						<canvas bind:this={canvases[index]}></canvas>
 
 						{#if showBoxes}
-							{#each markers.filter((marker) => marker.page === index) as marker (marker.id + index)}
+							{#each markers.filter((marker) => marker.page === index) as marker (marker.key)}
 								<div
 									class="marker"
 									data-severity={marker.severity}

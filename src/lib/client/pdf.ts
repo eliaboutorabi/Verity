@@ -126,6 +126,12 @@ export async function renderPage(
  * A scanned page has no text layer and returns nothing. That is not a failure;
  * it is the case the caller falls back for.
  *
+ * Returned in reading order, which pdf.js does not guarantee: it emits runs in
+ * content-stream order, and this document's second page comes out headings
+ * first, then body, then the footer. Every consumer here assumes otherwise, and
+ * the one that matters most silently produced a box 85% of the page tall — the
+ * union of a contiguous *index* range that was scattered all over it.
+ *
  * (Carried over from the Rowbot codebase.)
  */
 export async function pageTextRuns(
@@ -140,7 +146,7 @@ export async function pageTextRuns(
 	const sx = target.width / viewport.width;
 	const sy = target.height / viewport.height;
 
-	return content.items
+	const runs: TextRun[] = content.items
 		.filter((item: any) => typeof item.str === 'string' && item.str.trim() !== '')
 		.map((item: any) => {
 			const height = item.height || 0;
@@ -154,6 +160,21 @@ export async function pageTextRuns(
 				height: height * sy
 			};
 		});
+
+	return inReadingOrder(runs);
+}
+
+/**
+ * Down the page, then across it.
+ *
+ * Rows are quantised before comparing, so two runs on the same line whose
+ * baselines differ by a fraction of a point are not read as different lines and
+ * shuffled by their y. Three points is finer than any line spacing and coarser
+ * than any jitter.
+ */
+export function inReadingOrder(runs: TextRun[]): TextRun[] {
+	const row = (run: TextRun) => Math.round(run.y / 3);
+	return [...runs].sort((a, b) => row(a) - row(b) || a.x - b.x);
 }
 
 /**
@@ -225,11 +246,8 @@ function merge(a: PdfBlock, b: PdfBlock): PdfBlock {
 function blocksFrom(runs: TextRun[]): PdfBlock[] {
 	if (!runs.length) return [];
 
-	// Reading order: down the page, then across it.
-	const ordered = [...runs].sort((a, b) => a.y - b.y || a.x - b.x);
-
 	const lines: PdfBlock[] = [];
-	for (const run of ordered) {
+	for (const run of runs) {
 		const current = lines[lines.length - 1];
 		const box: PdfBlock = {
 			content: run.text,
@@ -247,10 +265,20 @@ function blocksFrom(runs: TextRun[]): PdfBlock[] {
 	const paragraphs: PdfBlock[] = [];
 	for (const line of lines) {
 		const current = paragraphs[paragraphs.length - 1];
-		// A gap wider than one and a half lines is a new paragraph. Anything
-		// tighter is the same one wrapping.
+		/*
+		 * A new paragraph as soon as the lines are further apart than the leading
+		 * within one.
+		 *
+		 * Wrapped lines in a paragraph nearly touch — the gap between one line's
+		 * foot and the next line's head is a fraction of a line height, often
+		 * zero. Anything more is a paragraph break. A looser rule than this
+		 * merged every clause of a numbered section into one block, and a quote
+		 * that then failed to match exactly got a proportional estimate of *that*
+		 * — a mark covering half the page, which points at everything and
+		 * therefore at nothing.
+		 */
 		const gap = current ? line.y - (current.y + current.height) : Infinity;
-		if (current && gap <= Math.max(line.height, 1) * 1.5) {
+		if (current && gap <= Math.max(line.height, 1) * 0.6) {
 			paragraphs[paragraphs.length - 1] = merge(current, line);
 		} else {
 			paragraphs.push({ ...line });

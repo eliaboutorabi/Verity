@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { locateInRuns } from './text-locate.js';
 import type { TextRun } from './client/pdf.js';
+import { inReadingOrder } from './client/pdf.js';
 
 /** Four list items, each wrapping onto two lines, as pdf.js reports them. */
 const runs: TextRun[] = [
@@ -87,5 +88,61 @@ describe('a quote whose punctuation drifted', () => {
 
 	it('refuses a passage that is not on the page, however it is punctuated', () => {
 		expect(locateInRuns('a paragraph from some other document entirely', runs)).toBeNull();
+	});
+});
+
+describe('runs that arrive out of reading order', () => {
+	/**
+	 * pdf.js emits runs in content-stream order, not reading order — this page's
+	 * headings come out before the body they head, and the footer last. A
+	 * contiguous *text* match then maps to a contiguous *index* range that is
+	 * scattered down the page, and the union of it was a box 85% of the page
+	 * tall, shading everything and pointing at nothing.
+	 */
+	const scrambled: TextRun[] = [
+		{ text: '4. TERM AND TERMINATION', x: 60, y: 400, width: 200, height: 12 },
+		{ text: 'Approved travel expenses shall be reimbursed', x: 60, y: 100, width: 300, height: 12 },
+		{ text: 'at the standard mileage rate.', x: 60, y: 116, width: 200, height: 12 },
+		{ text: 'SPECIMEN — for demonstration', x: 60, y: 760, width: 220, height: 8 }
+	];
+
+	it('is a hazard the locator cannot see, so the source must order them', () => {
+		const box = locateInRuns('travel expenses shall be reimbursed at the standard mileage rate', scrambled);
+		// Runs 1 and 2 are adjacent in the array here, so this one is fine —
+		// what breaks is a match whose range straddles a run that belongs
+		// somewhere else entirely.
+		expect(box!.height).toBeLessThan(60);
+	});
+
+	it('spans the page when an unrelated run sits between the matching ones', () => {
+		const straddled: TextRun[] = [
+			{ text: 'Approved travel expenses shall be', x: 60, y: 100, width: 300, height: 12 },
+			{ text: 'SPECIMEN — for demonstration', x: 60, y: 760, width: 220, height: 8 },
+			{ text: 'reimbursed at the standard rate.', x: 60, y: 116, width: 200, height: 12 }
+		];
+		const box = locateInRuns('travel expenses shall be SPECIMEN', straddled);
+		// This is the failure, stated: 600-odd points of page covered by a mark
+		// meant for two lines. inReadingOrder in pdf.ts is what prevents it.
+		expect(box!.height).toBeGreaterThan(600);
+	});
+});
+
+describe('inReadingOrder', () => {
+	it('puts a page back down-then-across', () => {
+		const scrambled: TextRun[] = [
+			{ text: 'heading', x: 60, y: 400, width: 200, height: 12 },
+			{ text: 'second half of line', x: 260, y: 100, width: 120, height: 12 },
+			{ text: 'first half of line', x: 60, y: 100.4, width: 190, height: 12 },
+			{ text: 'footer', x: 60, y: 760, width: 220, height: 8 }
+		];
+
+		expect(inReadingOrder(scrambled).map((run) => run.text)).toEqual([
+			// The two halves share a line despite differing baselines, so they are
+			// ordered by x rather than shuffled by a fraction of a point.
+			'first half of line',
+			'second half of line',
+			'heading',
+			'footer'
+		]);
 	});
 });
