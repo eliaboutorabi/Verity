@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { GOOD_KEY, questionStream, stubApi, unlock } from './fixtures.js';
+import { GOOD_KEY, highlightStream, questionStream, stubApi, unlock } from './fixtures.js';
 
 // Each test gets a fresh browser context, so local storage starts empty
 // without an init script — which would otherwise also wipe the key the
@@ -151,6 +151,27 @@ test.describe('a conversation', () => {
 
 		await send.click();
 		await expect(page.locator('.bubble')).toHaveText('Take a look at this.');
+	});
+
+	test('a marked-up document can be opened, and says so on the chip', async ({ page }) => {
+		await page.getByRole('button', { name: 'Engagement letter' }).click();
+		await expect(page.locator('.chips li')).toHaveCount(1);
+
+		await page.route('**/api/chat', async (route) => {
+			await route.fulfill({
+				status: 200,
+				headers: { 'Content-Type': 'text/event-stream' },
+				body: highlightStream('engagement-letter-brightline.pdf')
+			});
+		});
+		await page.getByLabel('Message Verity').fill('Mark up what worries you.');
+		await page.getByRole('button', { name: 'Send message' }).click();
+
+		// Marking a document with no way to see it is the same as not marking it.
+		await expect(page.locator('.chip-marks')).toHaveText('1 marked');
+		await page.getByRole('button', { name: 'Open the document' }).click();
+		await expect(page.locator('dialog[open]')).toBeVisible();
+		await expect(page.locator('dialog[open]')).toContainText('engagement-letter-brightline.pdf');
 	});
 
 	test('a multiple-choice question is answered by clicking', async ({ page }) => {

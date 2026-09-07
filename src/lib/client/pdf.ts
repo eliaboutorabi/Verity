@@ -155,3 +155,107 @@ export async function pageTextRuns(
 			};
 		});
 }
+
+/**
+ * The page geometry a PDF already carries, as blocks the matcher can search.
+ *
+ * Marking a passage on the page used to need a second provider: Mistral read
+ * the document, reported a box per block, and the text layer was used only to
+ * narrow that box to a sentence. Which meant that without a Mistral key the
+ * feature did not degrade — it simply did not exist, and someone who had never
+ * pasted a second key had no idea the app could do it at all.
+ *
+ * But the narrowing step was the tell. A PDF with a text layer knows exactly
+ * where it drew every word, so for those — which is most documents anybody
+ * sends an accountant — the geometry was already on the machine. OCR is the
+ * fallback now, for the scans that genuinely have no text to read.
+ *
+ * Runs are grouped into lines by vertical proximity and lines into paragraphs
+ * by the gap between them, because the matcher scores a quote against a block's
+ * text: one block per word would match nothing, and one per page would point at
+ * everything.
+ */
+export async function pdfPageBlocks(file: File): Promise<PdfPageBlocks[]> {
+	const url = URL.createObjectURL(file);
+	try {
+		const doc = await openDocument(url);
+		const pages: PdfPageBlocks[] = [];
+
+		for (let number = 1; number <= doc.numPages; number += 1) {
+			const page = await doc.getPage(number);
+			const { width, height } = page.getViewport({ scale: 1 });
+			const runs = await pageTextRuns(doc, number, { width, height });
+			pages.push({ index: number - 1, width, height, blocks: blocksFrom(runs) });
+		}
+
+		return pages;
+	} finally {
+		URL.revokeObjectURL(url);
+	}
+}
+
+export interface PdfBlock {
+	content: string;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+export interface PdfPageBlocks {
+	index: number;
+	width: number;
+	height: number;
+	blocks: PdfBlock[];
+}
+
+/** The union of two boxes. */
+function merge(a: PdfBlock, b: PdfBlock): PdfBlock {
+	const left = Math.min(a.x, b.x);
+	const top = Math.min(a.y, b.y);
+	return {
+		content: `${a.content} ${b.content}`.trim(),
+		x: left,
+		y: top,
+		width: Math.max(a.x + a.width, b.x + b.width) - left,
+		height: Math.max(a.y + a.height, b.y + b.height) - top
+	};
+}
+
+function blocksFrom(runs: TextRun[]): PdfBlock[] {
+	if (!runs.length) return [];
+
+	// Reading order: down the page, then across it.
+	const ordered = [...runs].sort((a, b) => a.y - b.y || a.x - b.x);
+
+	const lines: PdfBlock[] = [];
+	for (const run of ordered) {
+		const current = lines[lines.length - 1];
+		const box: PdfBlock = {
+			content: run.text,
+			x: run.x,
+			y: run.y,
+			width: run.width,
+			height: run.height
+		};
+		// Same line when the baselines are within half a line of each other.
+		const sameLine = current && Math.abs(run.y - current.y) <= Math.max(run.height, 1) * 0.6;
+		if (sameLine) lines[lines.length - 1] = merge(current, box);
+		else lines.push(box);
+	}
+
+	const paragraphs: PdfBlock[] = [];
+	for (const line of lines) {
+		const current = paragraphs[paragraphs.length - 1];
+		// A gap wider than one and a half lines is a new paragraph. Anything
+		// tighter is the same one wrapping.
+		const gap = current ? line.y - (current.y + current.height) : Infinity;
+		if (current && gap <= Math.max(line.height, 1) * 1.5) {
+			paragraphs[paragraphs.length - 1] = merge(current, line);
+		} else {
+			paragraphs.push({ ...line });
+		}
+	}
+
+	return paragraphs;
+}

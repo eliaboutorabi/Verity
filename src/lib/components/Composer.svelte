@@ -18,6 +18,7 @@
 	} from '@hugeicons/core-free-icons';
 	import Icon from './Icon.svelte';
 	import { documents } from '$lib/state/documents.svelte';
+	import { pages } from '$lib/state/pages.svelte';
 	import { extractText, isSupportedDocument, SUPPORTED_HINT } from '$lib/client/extract';
 
 	interface Props {
@@ -171,6 +172,11 @@
 					>
 						<Icon icon={document.kind === 'file' ? Pdf01Icon : File01Icon} size={15} />
 						<span class="chip-name">{document.name}</span>
+						{#if pages.forDocument(document.id).length}
+							<span class="chip-marks"
+								>{pages.forDocument(document.id).length} marked</span
+							>
+						{/if}
 					</button>
 					<button
 						class="chip-remove"
@@ -394,6 +400,18 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	/* What is on the document, so the chip is worth pressing. */
+	.chip-marks {
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
+		background: var(--accent-soft);
+		border-radius: 999px;
+		padding: 2px 6px;
 	}
 
 	.chip-remove {

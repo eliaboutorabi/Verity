@@ -241,10 +241,25 @@
 			{/each}
 		</ul>
 	{:else if result?.card === 'highlight'}
-		<p class="lead">
-			{result.marks.length}
-			{result.marks.length === 1 ? 'passage' : 'passages'} marked on {result.documentName}
-		</p>
+		<div class="marked">
+			<p class="lead">
+				{result.marks.length}
+				{result.marks.length === 1 ? 'passage' : 'passages'} marked on {result.documentName}
+			</p>
+			<!--
+				Marking a document with no way to see it is the same as not marking
+				it. The rows below open the page at one passage; this opens it at
+				the first, and is the thing anybody looks for.
+			-->
+			<button
+				class="open-doc"
+				type="button"
+				onclick={() => onshow?.(result.documentId, result.marks[0]?.quote ?? '')}
+			>
+				<Icon icon={MapsLocation01Icon} size={15} />
+				Open the document
+			</button>
+		</div>
 		<ul class="marks">
 			{#each result.marks as mark, index (index)}
 				<li data-severity={mark.severity}>
@@ -607,6 +622,38 @@
 	}
 
 	/* ---------------------------------------------------------------- marks */
+
+	.marked {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px 14px;
+		margin-bottom: 10px;
+	}
+
+	.marked .lead {
+		margin: 0;
+	}
+
+	.open-doc {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+		background: var(--accent-soft);
+		color: var(--accent);
+		border-radius: 999px;
+		padding: 6px 13px;
+		font-size: 13px;
+		font-weight: 620;
+		cursor: pointer;
+		transition: background 180ms var(--ease);
+	}
+
+	.open-doc:hover {
+		background: color-mix(in srgb, var(--accent) 22%, var(--accent-soft));
+	}
 
 	.marks {
 		gap: 6px;

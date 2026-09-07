@@ -72,6 +72,35 @@ export function questionStream(): string {
 		.join('');
 }
 
+/**
+ * One agent turn that marks up whatever document is loaded.
+ *
+ * The id is the first document's, because the specimen loader is what puts one
+ * there and it always numbers from one.
+ */
+export function highlightStream(documentName: string): string {
+	const view = {
+		card: 'highlight',
+		title: 'Marked up',
+		documentId: 'doc1',
+		documentName,
+		marks: [
+			{
+				quote: 'We guarantee that the credit as computed will withstand examination',
+				note: 'Guarantee of tax outcome',
+				severity: 'high'
+			}
+		]
+	};
+	return [
+		{ type: 'tool-call', callId: 'h1', name: 'highlight_document', label: 'Marking up the document' },
+		{ type: 'tool-result', callId: 'h1', name: 'highlight_document', isError: false, view, durationMs: 30 },
+		{ type: 'done' }
+	]
+		.map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
+		.join('');
+}
+
 /** One agent turn: a tool call, its result, then prose. */
 function chatStream(): string {
 	const frames = [

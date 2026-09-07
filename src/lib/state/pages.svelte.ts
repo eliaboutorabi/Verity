@@ -1,13 +1,24 @@
 /**
  * What Verity has read of a document, and what she is pointing at.
  *
- * OCR is not run on upload. It costs a call to a second provider and most
- * questions never need it, so it happens when someone opens the viewer or
- * when Verity asks to point at something — and only for documents that came
- * from a real file.
+ * Two ways to find out where a passage sits, tried in that order.
+ *
+ * A PDF with a text layer already knows where it drew every word, so its own
+ * geometry is read in the browser: free, exact, and available to everybody.
+ * This used to be a *refinement* on top of OCR, which meant marking a document
+ * required a second provider's key — and without one the feature did not
+ * degrade, it silently did not exist. Someone who had never pasted a Mistral
+ * key had no way to discover the app could point at anything at all.
+ *
+ * OCR is the fallback, for the scans that genuinely have no text to read. It
+ * still costs a call to a second provider, so it happens only when the first
+ * route comes back empty.
+ *
+ * Neither runs on upload: most questions never need either.
  */
 
 import { locateQuote, type BlockMatch, type OcrPageView } from '$lib/ocr-match';
+import { pdfPageBlocks } from '$lib/client/pdf';
 import { documents } from './documents.svelte';
 import { session } from './session.svelte';
 
@@ -26,6 +37,8 @@ interface DocumentRead {
 	status: ReadStatus;
 	pages: OcrPageView[];
 	error: string | null;
+	/** Which route produced the geometry, for anything that wants to say. */
+	source?: 'pdf' | 'ocr';
 }
 
 let counter = 0;
@@ -65,19 +78,49 @@ class PagesState {
 
 		const document = documents.get(documentId);
 		if (!document?.file) return false;
+
+		this.reads = { ...this.reads, [documentId]: { status: 'reading', pages: [], error: null } };
+
+		// The document's own text layer first. Most documents have one, and it
+		// is more accurate than anything read off a picture of the page.
+		if (document.mimeType === 'application/pdf' || /\.pdf$/i.test(document.name)) {
+			try {
+				const pages = await pdfPageBlocks(document.file);
+				if (pages.some((page) => page.blocks.length)) {
+					this.reads = {
+						...this.reads,
+						[documentId]: {
+							status: 'ready',
+							source: 'pdf',
+							error: null,
+							pages: pages.map((page) => ({
+								index: page.index,
+								width: page.width,
+								height: page.height,
+								markdown: '',
+								blocks: page.blocks.map((block) => ({ type: 'text', ...block }))
+							}))
+						}
+					};
+					return true;
+				}
+			} catch {
+				// A PDF we cannot parse is a case for OCR, not an error yet.
+			}
+		}
+
 		if (!session.canOcr) {
 			this.reads = {
 				...this.reads,
 				[documentId]: {
 					status: 'error',
 					pages: [],
-					error: 'Add a Mistral key in settings to read the page itself.'
+					error:
+						'This looks like a scan, with no text layer to read positions from. Add a Mistral key in settings and she can read the page itself.'
 				}
 			};
 			return false;
 		}
-
-		this.reads = { ...this.reads, [documentId]: { status: 'reading', pages: [], error: null } };
 
 		try {
 			const body = new FormData();
@@ -98,7 +141,7 @@ class PagesState {
 
 			this.reads = {
 				...this.reads,
-				[documentId]: { status: 'ready', pages: payload.pages, error: null }
+				[documentId]: { status: 'ready', source: 'ocr', pages: payload.pages, error: null }
 			};
 			return true;
 		} catch (cause) {

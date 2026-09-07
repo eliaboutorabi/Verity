@@ -47,6 +47,46 @@ function simplify(text: string): string {
 		.trim();
 }
 
+/**
+ * The same text with everything but letters, digits and spaces removed.
+ *
+ * A quote has to survive the round trip through a model to be found again, and
+ * punctuation is what it loses: a hyphen becomes an en dash, an apostrophe
+ * straightens, a comma is dropped. Matching on letters alone finds the passage
+ * anyway. Punctuation becomes a space rather than nothing, so a hyphenated word
+ * reads as two — the index map is kept in step so the box is still the union of
+ * the runs the words actually landed in.
+ */
+function lettersOnly(text: string, owner: number[]): { text: string; owner: number[] } {
+	let out = '';
+	const map: number[] = [];
+	for (let index = 0; index < text.length; index += 1) {
+		const character = text[index];
+		if (/[a-z0-9]/.test(character)) {
+			out += character;
+			map.push(owner[index]);
+			continue;
+		}
+		// A space, not nothing. Deleting the hyphen out of "shop-floor" welds it
+		// into "shopfloor", which then matches neither the page nor the quote.
+		if (!out.endsWith(' ') && out.length) {
+			out += ' ';
+			map.push(owner[index]);
+		}
+	}
+	// A trailing space would leave a dangling index; trim both together.
+	while (out.endsWith(' ')) {
+		out = out.slice(0, -1);
+		map.pop();
+	}
+	return { text: out, owner: map };
+}
+
+/** The needle put through the same sieve, where no index map is wanted. */
+function lettersOf(text: string): string {
+	return lettersOnly(text, []).text;
+}
+
 /** The union of the runs a quote spans, or null when it is not on this page. */
 export function locateInRuns(quote: string, runs: TextRun[]): Box | null {
 	if (!runs.length) return null;
@@ -55,11 +95,27 @@ export function locateInRuns(quote: string, runs: TextRun[]): Box | null {
 	if (needle.length < 8) return null;
 
 	const { text, owner } = flatten(runs);
-	const start = text.indexOf(needle);
-	if (start === -1) return null;
 
-	const first = owner[start];
-	const last = owner[Math.min(start + needle.length - 1, owner.length - 1)];
+	let start = text.indexOf(needle);
+	let span = needle.length;
+	let index = owner;
+
+	if (start === -1) {
+		// Punctuation is what a quote loses on the way through a model. Try
+		// again on letters alone before giving up and handing this to the
+		// block-level estimate, which puts the mark near the passage rather
+		// than on it.
+		const loose = lettersOnly(text, owner);
+		const target = lettersOf(needle);
+		const at = target ? loose.text.indexOf(target) : -1;
+		if (at === -1) return null;
+		start = at;
+		span = target.length;
+		index = loose.owner;
+	}
+
+	const first = index[start];
+	const last = index[Math.min(start + span - 1, index.length - 1)];
 	if (first === undefined || last === undefined) return null;
 
 	const spanned = runs.slice(first, last + 1);

@@ -36,11 +36,17 @@ JSON or PDF — or just paste it in; anything long enough becomes an attachment
 rather than a message. Verity scans for passages carrying a federal regulatory
 exposure, names the concern, and reads the regulation that settles it.
 
-**And ask where.** With a Mistral key she marks the passages on the page
-itself, colour-coded by severity. Mistral Document AI reports where each block
-sits; the PDF's own text layer narrows that to the sentence, so a mark frames
-the line it belongs to rather than the paragraph around it. A scan with no text
-layer falls back to the block.
+**And ask where.** She marks the passages on the page itself, colour-coded by
+severity, and the marking card offers a button that opens the document at the
+first one. The geometry comes from the PDF's own text layer — it knows where it
+drew every word — so this needs no second provider and no key. Mistral Document
+AI is the fallback for scans, which have no text to read positions from.
+
+A quote makes a round trip through a model before it comes back to be marked,
+and punctuation is what it loses: a hyphen becomes an en dash, an apostrophe
+straightens, a comma goes missing. So the match falls back to letters alone,
+with punctuation read as a space rather than deleted — otherwise "shop-floor"
+welds into "shopfloor" and matches nothing.
 
 **Or be taught by her.** Ask her to explain a rule rather than answer a
 question and she looks it up and puts a lesson on the screen — three to five
@@ -98,7 +104,7 @@ Two free public APIs. Neither needs a key, an account, or a payment method.
 | --- | --- | --- | --- |
 | [eCFR](https://www.ecfr.gov/developers) | What the rule **is** | Search and full section text across CFR titles 12, 17, 26, 29, 31 and 48 | none |
 | [Federal Register](https://www.federalregister.gov/developers/api/v1) | What is **changing** | Proposed and final rules, effective dates, comment deadlines | none |
-| [Mistral Document AI](https://docs.mistral.ai/) | **Where** a passage sits | Reading a PDF so a finding can be drawn on the page | yours, optional |
+| [Mistral Document AI](https://docs.mistral.ai/) | **Where** a passage sits, on a scan | Reading a page with no text layer, so a finding can still be drawn on it | yours, optional |
 
 ### Search is not the eCFR's own search
 

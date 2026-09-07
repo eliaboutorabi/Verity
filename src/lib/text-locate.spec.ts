@@ -66,3 +66,26 @@ describe('locateInRuns', () => {
 		expect(locateInRuns('the', runs)).toBeNull();
 	});
 });
+
+describe('a quote whose punctuation drifted', () => {
+	it('finds the passage anyway', () => {
+		// A quote makes a round trip through a model before it comes back to be
+		// marked, and punctuation is what it loses: a hyphen becomes an en dash,
+		// an apostrophe straightens, a comma goes missing. Without this the mark
+		// fell back to a block-level estimate and clipped the passage in half.
+		const box = locateInRuns('shop floor staff as independent contractors', runs);
+		expect(box).not.toBeNull();
+		expect(box!.y).toBeLessThan(105);
+	});
+
+	it('still covers both lines when it matches loosely', () => {
+		const box = locateInRuns('owner will take a minimal salary — and the rest in distributions', runs)!;
+		expect(box).not.toBeNull();
+		expect(box.y).toBeLessThan(150);
+		expect(box.y + box.height).toBeGreaterThan(174);
+	});
+
+	it('refuses a passage that is not on the page, however it is punctuated', () => {
+		expect(locateInRuns('a paragraph from some other document entirely', runs)).toBeNull();
+	});
+});
