@@ -154,8 +154,17 @@ export async function stubApi(
 	 * Registered first, and therefore matched last: Playwright tries routes in
 	 * the reverse order they were added. Anything the rules below do not claim
 	 * is a test reaching the real internet by accident.
+	 *
+	 * The site's own origin is exempt, because the suite can be pointed at a
+	 * deployed build — where the app is served from github.io rather than
+	 * localhost, and aborting it would abort the page under test.
 	 */
-	await page.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/, (route) => route.abort());
+	const ownOrigin = process.env.E2E_BASE_URL ? new URL(process.env.E2E_BASE_URL).origin : null;
+
+	await page.route(
+		(url) => url.origin !== ownOrigin && !/^(localhost|127\.0\.0\.1)$/.test(url.hostname),
+		(route) => route.abort()
+	);
 
 	await page.route('**/api.openai.com/v1/models', async (route) => {
 		const auth = route.request().headers()['authorization'] ?? '';
