@@ -19,6 +19,7 @@
 
 import { locateQuote, type BlockMatch, type OcrPageView } from '$lib/ocr-match';
 import { pdfPageBlocks } from '$lib/client/pdf';
+import { runOcr } from '$lib/ocr-service';
 import { documents } from './documents.svelte';
 import { session } from './session.svelte';
 
@@ -123,25 +124,34 @@ class PagesState {
 		}
 
 		try {
-			const body = new FormData();
-			body.append('file', document.file);
-			const response = await fetch('/api/ocr', {
-				method: 'POST',
-				headers: { 'x-mistral-key': session.mistralKey },
-				body
-			});
+			const bytes = new Uint8Array(await document.file.arrayBuffer());
+			const result = await runOcr(
+				session.mistralKey,
+				bytes,
+				document.mimeType || 'application/pdf',
+				document.name
+			);
 
-			const payload = (await response.json().catch(() => null)) as
-				| { pages?: OcrPageView[]; message?: string }
-				| null;
-
-			if (!response.ok || !payload?.pages) {
-				throw new Error(payload?.message ?? `The document could not be read (${response.status}).`);
-			}
+			// Only what the viewer draws with: page shape, and the boxes plus the
+			// text inside them. The rest of Mistral's payload is not ours to keep.
+			const pages: OcrPageView[] = result.pages.map((page) => ({
+				index: page.index,
+				width: page.dimensions?.width ?? null,
+				height: page.dimensions?.height ?? null,
+				markdown: page.markdown,
+				blocks: (page.blocks ?? []).map((block) => ({
+					type: block.type,
+					content: block.content,
+					x: block.top_left_x,
+					y: block.top_left_y,
+					width: block.bottom_right_x - block.top_left_x,
+					height: block.bottom_right_y - block.top_left_y
+				}))
+			}));
 
 			this.reads = {
 				...this.reads,
-				[documentId]: { status: 'ready', source: 'ocr', pages: payload.pages, error: null }
+				[documentId]: { status: 'ready', source: 'ocr', pages, error: null }
 			};
 			return true;
 		} catch (cause) {

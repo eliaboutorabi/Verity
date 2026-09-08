@@ -1,5 +1,19 @@
 import { expect, test } from '@playwright/test';
-import { GOOD_KEY, highlightStream, questionStream, stubApi, unlock } from './fixtures.js';
+import { GOOD_KEY, responsesStream, stubApi, unlock } from './fixtures.js';
+
+/** Make the next model turn do exactly this, whatever it was going to do. */
+async function nextTurn(
+	page: import('@playwright/test').Page,
+	frames: Parameters<typeof responsesStream>[0]
+) {
+	await page.route('**/api.openai.com/v1/responses', async (route) => {
+		await route.fulfill({
+			status: 200,
+			headers: { 'Content-Type': 'text/event-stream' },
+			body: responsesStream(frames)
+		});
+	});
+}
 
 // Each test gets a fresh browser context, so local storage starts empty
 // without an init script — which would otherwise also wipe the key the
@@ -10,13 +24,13 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('the key gate', () => {
 	test('meets a visitor with the robot, not a form', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await expect(page.getByLabel('Verity, an animated calculator robot')).toBeVisible();
 		await expect(page.getByRole('heading', { name: /runs on your OpenAI account/ })).toBeVisible();
 	});
 
 	test('reports a rejected key and stays put', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await page.getByLabel('OpenAI API key').fill('sk-wrongwrongwrongwrongwrongwrongwrong');
 		await page.getByRole('button', { name: 'Start', exact: true }).click();
 
@@ -25,7 +39,7 @@ test.describe('the key gate', () => {
 	});
 
 	test('opens the app on a good key and remembers it', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await unlock(page);
 		await expect(page.getByPlaceholder('Ask about a regulation…')).toBeVisible();
 
@@ -34,14 +48,14 @@ test.describe('the key gate', () => {
 	});
 
 	test('hides the app controls until a key is entered', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await expect(page.getByRole('button', { name: 'Settings' })).toHaveCount(0);
 		await unlock(page);
 		await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
 	});
 
 	test('voice is disabled until a key is entered', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await expect(page.getByRole('button', { name: /voice conversation/ })).toBeDisabled();
 		await unlock(page);
 		await expect(page.getByRole('button', { name: /voice conversation/ })).toBeEnabled();
@@ -50,7 +64,7 @@ test.describe('the key gate', () => {
 
 test.describe('the theme', () => {
 	test.beforeEach(async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await unlock(page);
 	});
 
@@ -86,7 +100,7 @@ test.describe('the theme', () => {
 
 test.describe('a conversation', () => {
 	test.beforeEach(async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await unlock(page);
 	});
 
@@ -157,13 +171,24 @@ test.describe('a conversation', () => {
 		await page.getByRole('button', { name: 'Engagement letter' }).click();
 		await expect(page.locator('.chips li')).toHaveCount(1);
 
-		await page.route('**/api/chat', async (route) => {
-			await route.fulfill({
-				status: 200,
-				headers: { 'Content-Type': 'text/event-stream' },
-				body: highlightStream('engagement-letter-brightline.pdf')
-			});
-		});
+		// The tool runs for real, so the card is drawn by its own presenter.
+		await nextTurn(page, [
+			{
+				call: {
+					name: 'highlight_document',
+					args: {
+						document: 'engagement-letter-brightline.pdf',
+						marks: [
+							{
+								quote: 'We guarantee that the credit as computed will withstand examination',
+								note: 'Guarantee of tax outcome',
+								severity: 'high'
+							}
+						]
+					}
+				}
+			}
+		]);
 		await page.getByLabel('Message Verity').fill('Mark up what worries you.');
 		await page.getByRole('button', { name: 'Send message' }).click();
 
@@ -172,12 +197,15 @@ test.describe('a conversation', () => {
 		// A grid item's default min-width refuses to shrink below its contents, so
 		// a row whose text will not wrap used to push out through the side of the
 		// card. Everything inside is prepared to be clamped; the item has to let it.
-		const overflow = await page.locator('.marks button').first().evaluate((el) => ({
-			scroll: el.scrollWidth,
-			client: el.clientWidth,
-			cardRight: el.closest('article.card')!.getBoundingClientRect().right,
-			rowRight: el.getBoundingClientRect().right
-		}));
+		const overflow = await page
+			.locator('.marks button')
+			.first()
+			.evaluate((el) => ({
+				scroll: el.scrollWidth,
+				client: el.clientWidth,
+				cardRight: el.closest('article.card')!.getBoundingClientRect().right,
+				rowRight: el.getBoundingClientRect().right
+			}));
 		expect(overflow.scroll).toBeLessThanOrEqual(overflow.client);
 		expect(overflow.rowRight).toBeLessThanOrEqual(overflow.cardRight);
 
@@ -199,13 +227,27 @@ test.describe('a conversation', () => {
 	});
 
 	test('a multiple-choice question is answered by clicking', async ({ page }) => {
-		await page.route('**/api/chat', async (route) => {
-			await route.fulfill({
-				status: 200,
-				headers: { 'Content-Type': 'text/event-stream' },
-				body: questionStream()
-			});
-		});
+		await nextTurn(page, [
+			{
+				call: {
+					name: 'ask_question',
+					args: {
+						area: 'Individuals',
+						topic: 'Passive activity losses',
+						skill: 'application',
+						question:
+							'A taxpayer has a $12,000 rental loss and $8,000 of passive income. What happens?',
+						choices: [
+							{ label: 'A', text: 'All $12,000 is deductible.' },
+							{ label: 'B', text: '$8,000 is absorbed and $4,000 is suspended.' }
+						],
+						hints: ['Net the passive loss against passive income first.'],
+						answer: 'B. The $8,000 of passive income absorbs $8,000 of the loss.',
+						citation: '26 CFR § 1.469-2'
+					}
+				}
+			}
+		]);
 
 		await page.getByLabel('Message Verity').fill('Quiz me.');
 		await page.getByRole('button', { name: 'Send message' }).click();
@@ -249,7 +291,7 @@ test.describe('a conversation', () => {
 
 test.describe('documents', () => {
 	test.beforeEach(async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await unlock(page);
 	});
 
@@ -292,7 +334,7 @@ test.describe('documents', () => {
 
 test.describe('settings', () => {
 	test.beforeEach(async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await unlock(page);
 		await page.getByRole('button', { name: 'Settings' }).click();
 		await expect(page.locator('dialog[open]')).toBeVisible();
@@ -359,7 +401,7 @@ test.describe('on a phone', () => {
 	test.use({ viewport: { width: 375, height: 812 } });
 
 	test('the page never scrolls sideways and the composer stays put', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await unlock(page);
 
 		await page.getByLabel('Message Verity').fill('What substantiates travel?');

@@ -20,6 +20,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { base } from '$app/paths';
+
 export interface TextRun {
 	text: string;
 	x: number;
@@ -44,8 +46,10 @@ export async function openDocument(url: string): Promise<any> {
 	const lib = await pdfjs();
 	return lib.getDocument({
 		url,
-		standardFontDataUrl: '/pdfjs/standard_fonts/',
-		cMapUrl: '/pdfjs/cmaps/',
+		// Through `base`, because a project site on GitHub Pages is served from a
+		// subdirectory and an absolute path would leave it.
+		standardFontDataUrl: `${base}/pdfjs/standard_fonts/`,
+		cMapUrl: `${base}/pdfjs/cmaps/`,
 		cMapPacked: true
 	}).promise;
 }

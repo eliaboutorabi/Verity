@@ -1,7 +1,18 @@
-/** Text-mode transport: post a turn, read the agent's event stream back. */
+/**
+ * Text-mode transport.
+ *
+ * There is no transport any more. This used to post a turn to a route and read
+ * an event stream back; the route ran the agent loop, which is plain
+ * fetch-driven TypeScript with nothing in it a browser cannot do. So the loop
+ * runs here, and what was a network hop is a function call.
+ *
+ * The signature is unchanged because the caller's job is unchanged: hand over a
+ * turn, read `AgentEvent`s as they happen, and abort by signal.
+ */
 
 import type { AgentEvent } from '$lib/harness';
 import type { StoredDocument } from '$lib/plugins';
+import { describeError, runTurn, type Brain } from './openai';
 
 export interface ChatTurn {
 	apiKey: string;
@@ -9,7 +20,7 @@ export interface ChatTurn {
 	messages: { role: 'user' | 'assistant'; content: string }[];
 	documents: StoredDocument[];
 	/** Knowledge, skills and the tool packs those skills need. */
-	brain?: unknown;
+	brain?: Brain;
 	/** Interview questions already drawn, so the next one is a new one. */
 	askedQuestions?: readonly string[];
 	/** A question is on screen and unmarked, so another may not be asked. */
@@ -17,59 +28,22 @@ export interface ChatTurn {
 	signal?: AbortSignal;
 }
 
-/** Yields one `AgentEvent` per server-sent frame. */
+/** Yields one `AgentEvent` per step of the turn. */
 export async function* streamTurn(turn: ChatTurn): AsyncGenerator<AgentEvent> {
-	const response = await fetch('/api/chat', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', 'x-openai-key': turn.apiKey },
-		signal: turn.signal,
-		body: JSON.stringify({
+	try {
+		yield* runTurn({
+			apiKey: turn.apiKey,
+			model: turn.model,
 			messages: turn.messages,
 			documents: turn.documents,
-			model: turn.model,
 			brain: turn.brain,
 			askedQuestions: turn.askedQuestions,
-			openQuestion: turn.openQuestion
-		})
-	});
-
-	if (!response.ok || !response.body) {
-		const body = (await response.json().catch(() => null)) as { message?: string } | null;
-		yield {
-			type: 'error',
-			message: body?.message ?? `The server returned ${response.status}.`,
-			status: response.status
-		};
-		return;
-	}
-
-	const reader = response.body.getReader();
-	const decoder = new TextDecoder();
-	let buffer = '';
-
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			buffer += decoder.decode(value, { stream: true });
-
-			let boundary: number;
-			while ((boundary = buffer.indexOf('\n\n')) !== -1) {
-				const frame = buffer.slice(0, boundary);
-				buffer = buffer.slice(boundary + 2);
-				for (const line of frame.split('\n')) {
-					if (!line.startsWith('data:')) continue;
-					const payload = line.slice(5).trim();
-					if (!payload) continue;
-					try {
-						yield JSON.parse(payload) as AgentEvent;
-					} catch {
-						// A partial frame is not worth ending the turn over.
-					}
-				}
-			}
-		}
-	} finally {
-		reader.releaseLock();
+			openQuestion: turn.openQuestion,
+			signal: turn.signal
+		});
+	} catch (cause) {
+		// An abort is the caller stopping the turn, not a failure to report.
+		if (turn.signal?.aborted) return;
+		yield { type: 'error', message: describeError(cause) };
 	}
 }

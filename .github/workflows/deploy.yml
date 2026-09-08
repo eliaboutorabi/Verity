@@ -1,0 +1,73 @@
+# Build the site and publish it to GitHub Pages.
+#
+# The app is static — every request it makes goes from the browser straight to
+# the upstream that answers it, on the reader's own key — so there is nothing
+# here but a build and an upload. No secrets are needed and none are used: a
+# key pasted into the running site never reaches this workflow or the host.
+#
+# The whole suite runs first. Deploying is publishing, and a green checkmark on
+# a broken page is worse than a red one on a working repository.
+
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a superseded run is not worth finishing.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Both the unit projects and the end-to-end run drive a real Chromium.
+      - run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run check
+
+      - name: Unit and browser tests
+        run: npx vitest run
+
+      - name: End to end
+        run: npx playwright test
+
+      - name: Build
+        # Pages serves a project site from /<repo>, and every asset URL has to
+        # carry it. Taken from the repository rather than written down, so
+        # renaming the repository does not quietly break every path.
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

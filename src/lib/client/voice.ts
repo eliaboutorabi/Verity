@@ -14,9 +14,10 @@
 
 import type { ToolCallView, ToolResult, ToolResultView } from '$lib/harness';
 import { spokenCorrection } from '$lib/plugins/verify';
-import type { StoredDocument } from '$lib/plugins';
+import type { PriorCall, StoredDocument } from '$lib/plugins';
 import type { CharacterId } from '$lib/voices';
 import { MOUTH_AT_REST, VoiceMouth, type MouthPose } from './lipsync';
+import { mintRealtimeSecret, runToolCall, type Brain } from './openai';
 
 export type VoiceStatus =
 	| 'idle'
@@ -360,19 +361,11 @@ export class VoiceSession {
 	// ------------------------------------------------------------- internals
 
 	async #mintSecret(options: VoiceStartOptions): Promise<string> {
-		const response = await fetch('/api/realtime', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json', 'x-openai-key': options.apiKey },
-			body: JSON.stringify({ character: options.character, brain: options.brain })
+		const secret = await mintRealtimeSecret(options.apiKey, {
+			character: options.character,
+			brain: options.brain as Brain | undefined
 		});
-		const payload = (await response.json().catch(() => null)) as
-			| { clientSecret?: string; message?: string }
-			| null;
-
-		if (!response.ok || !payload?.clientSecret) {
-			throw new Error(payload?.message ?? `Could not start a voice session (${response.status}).`);
-		}
-		return payload.clientSecret;
+		return secret.clientSecret;
 	}
 
 	/**
@@ -613,38 +606,22 @@ export class VoiceSession {
 		let durationMs: number | undefined;
 
 		try {
-			const response = await fetch('/api/tools', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					callId: call.callId,
-					name: call.name,
-					arguments: parsed,
-					documents: this.#documents,
-					brain: this.#brain,
-					priorCalls,
-					askedQuestions: this.handlers.askedQuestions?.() ?? [],
-					openQuestion: this.handlers.openQuestion?.() ?? false
-				})
+			const outcome = await runToolCall({
+				callId: call.callId,
+				name: call.name,
+				arguments: parsed as Record<string, never>,
+				documents: this.#documents,
+				brain: this.#brain as Brain | undefined,
+				priorCalls: priorCalls as PriorCall[],
+				askedQuestions: this.handlers.askedQuestions?.() ?? [],
+				openQuestion: this.handlers.openQuestion?.() ?? false
 			});
-			const payload = (await response.json()) as {
-				output?: string;
-				isError?: boolean;
-				view?: ToolResultView | null;
-				durationMs?: number;
-				message?: string;
-			};
-
-			if (response.ok) {
-				output = payload.output ?? output;
-				isError = payload.isError ?? false;
-				view = payload.view ?? undefined;
-				durationMs = payload.durationMs;
-			} else {
-				output = payload.message ?? `The tool server returned ${response.status}.`;
-			}
+			output = outcome.output || output;
+			isError = outcome.isError;
+			view = outcome.view;
+			durationMs = outcome.durationMs;
 		} catch (cause) {
-			output = `The tool could not be reached: ${describeVoiceError(cause)}`;
+			output = `The tool could not be run: ${describeVoiceError(cause)}`;
 		}
 
 		this.handlers.onToolResult(call.callId, isError, view, durationMs);

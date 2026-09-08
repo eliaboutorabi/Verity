@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
-import adapter from '@sveltejs/adapter-vercel';
+import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
@@ -19,9 +19,27 @@ export default defineConfig({
 		sveltekit({
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
-				runes: ({ filename }) => filename.split(/[/\\]/).includes('node_modules') ? undefined : true
+				runes: ({ filename }) =>
+					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter(),
+			/*
+			 * A static site, because there is nothing left for a server to do.
+			 *
+			 * Every upstream the app talks to answers a cross-origin request, and
+			 * the agent loop is plain fetch-driven TypeScript, so the five routes
+			 * that used to proxy them are gone and the whole thing is one page of
+			 * HTML plus its assets. That is what makes GitHub Pages a real host for
+			 * it rather than a place to park a landing page — and it is the honest
+			 * version of bring-your-own-key, because there is no longer a server
+			 * for the key to pass through.
+			 */
+			adapter: adapter({ fallback: '404.html' }),
+			/*
+			 * Pages serves a project site from a subdirectory, so every asset URL
+			 * has to carry it. Empty everywhere else, which is what dev and the
+			 * end-to-end run want.
+			 */
+			paths: { base: (process.env.BASE_PATH ?? '') as '' | `/${string}` }
 		})
 	],
 	test: {

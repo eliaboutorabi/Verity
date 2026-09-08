@@ -28,3 +28,6 @@ test-results
 playwright-report
 blob-report
 .playwright
+
+# Screen recordings made while testing. Working files, not project files.
+screen_recording/

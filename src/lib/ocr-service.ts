@@ -2,8 +2,9 @@
  * Typed client for Mistral Document AI (OCR).
  *
  * We call the REST endpoint directly rather than through the SDK: the request
- * we need is a single POST, and this keeps the serverless bundle small and the
- * exact request shape visible at the call site.
+ * we need is a single POST, and this keeps the bundle small and the exact
+ * request shape visible at the call site. It runs in the browser — Mistral
+ * answers a cross-origin request — so the key never leaves the tab.
  *
  * What this buys the app is geometry. OpenAI's models can read a document but
  * cannot say where on the page a sentence sits, so nothing can be pointed at.

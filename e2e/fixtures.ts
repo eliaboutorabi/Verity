@@ -1,161 +1,233 @@
 /**
- * Stubbed API routes for the end-to-end tests.
+ * Stubbed upstreams for the end-to-end tests.
  *
- * The UI is what these tests are about, so the network is pinned rather than
- * live: no OpenAI key, no calls to two free government APIs on every run, and
- * a card list that is the same on Tuesday as it was on Monday.
+ * These used to intercept the app's own API routes, which was a convenient
+ * seam and a slightly dishonest one: the agent loop, the tool registry and
+ * every presenter were on the far side of it and never ran. There are no
+ * routes any more — the whole thing runs in the browser — so the stubs moved
+ * out to the real boundary, which is the four hosts the app actually talks to.
+ *
+ * What that buys is that a test now exercises the same code the reader does:
+ * the model's stream is parsed by the real adapter, the tool call is dispatched
+ * through the real registry, and the card on screen is drawn by the tool's own
+ * presenter rather than by a fixture pretending to be one.
  */
 
-import type { Page } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 
 export const GOOD_KEY = 'sk-test000000000000000000000000000000000000';
 
 export const MODELS = {
-	models: ['gpt-5.4-mini', 'gpt-4.1-mini'],
-	defaultModel: 'gpt-5.4-mini',
+	models: ['gpt-5.6-luna', 'gpt-4.1-mini'],
+	defaultModel: 'gpt-5.6-luna',
 	realtimeAvailable: true
 };
 
-const SEARCH_VIEW = {
-	card: 'results',
-	title: 'Title 26 results',
-	query: 'substantiation requirements',
-	hits: [
-		{
-			citation: '26 CFR § 1.274-5',
-			heading: 'Substantiation requirements.',
-			hierarchy: 'Title 26 › Internal Revenue Service › Items Not Deductible',
-			url: 'https://www.ecfr.gov/current/title-26/section-1.274-5',
-			excerpt: 'Adequate records or sufficient evidence corroborating the taxpayer’s own statement.'
-		},
-		{
-			citation: '26 CFR § 1.162-17',
-			heading: 'Reporting and substantiation of certain business expenses of employees.',
-			hierarchy: 'Title 26 › Internal Revenue Service › Itemized Deductions',
-			url: 'https://www.ecfr.gov/current/title-26/section-1.162-17'
-		}
-	]
-};
+// ------------------------------------------------------- the model's stream
 
-const QUESTION_VIEW = {
-	card: 'question',
-	title: 'Passive activity losses',
-	question: {
-		id: 'q1',
-		area: 'Individuals',
-		topic: 'Passive activity losses',
-		skill: 'application',
-		prompt: 'A taxpayer has a $12,000 rental loss and $8,000 of passive income. What happens?',
-		choices: [
-			{ label: 'A', text: 'All $12,000 is deductible.' },
-			{ label: 'B', text: '$8,000 is absorbed and $4,000 is suspended.' }
-		],
-		hints: ['Net the passive loss against passive income first.'],
-		answer: 'B. The $8,000 of passive income absorbs $8,000 of the loss.',
-		citation: '26 CFR § 1.469-2'
-	}
-};
-
-/** One agent turn that puts a question on screen and waits. */
-export function questionStream(): string {
-	return [
-		{
-			type: 'tool-call',
-			callId: 'q1',
-			name: 'ask_question',
-			label: 'Asking a question'
-		},
-		{ type: 'tool-result', callId: 'q1', name: 'ask_question', isError: false, view: QUESTION_VIEW, durationMs: 90 },
-		{ type: 'done' }
-	]
-		.map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
-		.join('');
-}
+/** One thing the model does: say something, or call a tool. */
+export type Frame = { text: string } | { call: { name: string; args?: unknown; id?: string } };
 
 /**
- * One agent turn that marks up whatever document is loaded.
+ * A Responses API event stream, as the adapter expects to read it.
  *
- * The id is the first document's, because the specimen loader is what puts one
- * there and it always numbers from one.
+ * Only the events the adapter acts on — a text delta, and the pair that opens
+ * and closes a function call. Anything else it ignores, so anything else would
+ * only be noise in a fixture.
  */
-export function highlightStream(documentName: string): string {
-	const view = {
-		card: 'highlight',
-		title: 'Marked up',
-		documentId: 'doc1',
-		documentName,
-		marks: [
-			{
-				quote: 'We guarantee that the credit as computed will withstand examination',
-				note: 'Guarantee of tax outcome',
-				severity: 'high'
-			}
-		]
-	};
-	return [
-		{ type: 'tool-call', callId: 'h1', name: 'highlight_document', label: 'Marking up the document' },
-		{ type: 'tool-result', callId: 'h1', name: 'highlight_document', isError: false, view, durationMs: 30 },
-		{ type: 'done' }
-	]
-		.map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
-		.join('');
-}
+export function responsesStream(frames: Frame[]): string {
+	const lines: string[] = [];
+	let counter = 0;
 
-/** One agent turn: a tool call, its result, then prose. */
-function chatStream(): string {
-	const frames = [
-		{
-			type: 'tool-call',
-			callId: 'c1',
-			name: 'search_regulations',
-			label: 'Searching the eCFR',
-			view: { card: 'search', title: 'Title 26', query: 'substantiation requirements' }
-		},
-		{
-			type: 'tool-result',
-			callId: 'c1',
-			name: 'search_regulations',
-			isError: false,
-			view: SEARCH_VIEW,
-			durationMs: 412
-		},
-		{ type: 'text', delta: 'Travel deductions turn on **26 CFR § 1.274-5**. ' },
-		{ type: 'text', delta: 'You need the amount, time, place and business purpose.' },
-		{ type: 'done' }
-	];
-	return frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('');
-}
+	const send = (type: string, body: Record<string, unknown>) =>
+		lines.push(`event: ${type}\ndata: ${JSON.stringify({ type, ...body })}\n\n`);
 
-/** Intercept every API route the app talks to. */
-export async function stubApi(page: Page, options: { validKey?: string } = {}) {
-	const valid = options.validKey ?? GOOD_KEY;
-
-	await page.route('**/api/models', async (route) => {
-		const key = route.request().headers()['x-openai-key'];
-		if (key !== valid) {
-			await route.fulfill({
-				status: 401,
-				contentType: 'application/json',
-				body: JSON.stringify({ message: 'That OpenAI API key was rejected. Check the key and try again.' })
-			});
-			return;
+	for (const frame of frames) {
+		if ('text' in frame) {
+			send('response.output_text.delta', { delta: frame.text });
+			continue;
 		}
-		await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MODELS) });
-	});
+		const id = frame.call.id ?? `call_${(counter += 1)}`;
+		send('response.output_item.added', {
+			item: { id, type: 'function_call', call_id: id, name: frame.call.name }
+		});
+		send('response.function_call_arguments.done', {
+			item_id: id,
+			arguments: JSON.stringify(frame.call.args ?? {})
+		});
+	}
 
-	await page.route('**/api/chat', async (route) => {
+	send('response.completed', {});
+	return lines.join('');
+}
+
+/** Reply with these frames once, then fall through to plain prose. */
+function scriptedModel(scripts: Frame[][]): (route: Route) => Promise<void> {
+	let turn = 0;
+	return async (route) => {
+		const frames = scripts[Math.min(turn, scripts.length - 1)];
+		turn += 1;
 		await route.fulfill({
 			status: 200,
 			headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
-			body: chatStream()
+			body: responsesStream(frames)
 		});
-	});
+	};
+}
 
-	await page.route('**/api/realtime', async (route) => {
+// ------------------------------------------------------------------- eCFR
+
+const SECTIONS = [
+	{
+		identifier: '1.274-5',
+		label: '§ 1.274-5 Substantiation requirements.',
+		label_description: 'Substantiation requirements.',
+		title: '26',
+		body:
+			'No deduction shall be allowed for travel away from home unless the taxpayer ' +
+			'substantiates the amount, time, place and business purpose of the expenditure.'
+	},
+	{
+		identifier: '1.162-17',
+		label: '§ 1.162-17 Reporting and substantiation of certain business expenses of employees.',
+		label_description: 'Reporting and substantiation of certain business expenses of employees.',
+		title: '26',
+		body: 'An employee adequately accounts by submitting a written expense account.'
+	}
+];
+
+/** The shape the title-structure index reads, cut down to two sections. */
+const STRUCTURE = {
+	type: 'title',
+	identifier: '26',
+	label: 'Title 26',
+	children: [
+		{
+			type: 'chapter',
+			identifier: 'I',
+			label: 'Chapter I — Internal Revenue Service',
+			children: SECTIONS.map((section) => ({
+				type: 'section',
+				identifier: section.identifier,
+				label: section.label,
+				label_description: section.label_description,
+				reserved: false
+			}))
+		}
+	]
+};
+
+function sectionXml(identifier: string): string {
+	const section = SECTIONS.find((candidate) => candidate.identifier === identifier) ?? SECTIONS[0];
+	return `<?xml version="1.0"?><DIV8 N="${section.identifier}" TYPE="SECTION"><HEAD>${section.label}</HEAD><P>${section.body}</P></DIV8>`;
+}
+
+// -------------------------------------------------------------------- setup
+
+/**
+ * Intercept every host the app reaches for.
+ *
+ * A route that is not stubbed is a test talking to the internet, so the last
+ * rule aborts anything unrecognised rather than letting it through quietly.
+ */
+export async function stubApi(
+	page: Page,
+	options: { validKey?: string; scripts?: Frame[][] } = {}
+) {
+	const valid = options.validKey ?? GOOD_KEY;
+	const scripts = options.scripts ?? [
+		[
+			{
+				call: {
+					name: 'search_regulations',
+					args: { query: 'substantiation requirements', title: 26 }
+				}
+			}
+		],
+		[
+			{ text: 'Travel deductions turn on **26 CFR § 1.274-5**. ' },
+			{ text: 'You need the amount, time, place and business purpose.' }
+		]
+	];
+
+	/*
+	 * Registered first, and therefore matched last: Playwright tries routes in
+	 * the reverse order they were added. Anything the rules below do not claim
+	 * is a test reaching the real internet by accident.
+	 */
+	await page.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/, (route) => route.abort());
+
+	await page.route('**/api.openai.com/v1/models', async (route) => {
+		const auth = route.request().headers()['authorization'] ?? '';
+		if (!auth.endsWith(valid)) {
+			await route.fulfill({
+				status: 401,
+				contentType: 'application/json',
+				body: JSON.stringify({ error: { message: 'Incorrect API key provided.' } })
+			});
+			return;
+		}
 		await route.fulfill({
 			status: 200,
 			contentType: 'application/json',
-			body: JSON.stringify({ clientSecret: 'ek_test', model: 'gpt-realtime-2', voice: 'cedar' })
+			body: JSON.stringify({
+				data: [...MODELS.models, 'gpt-realtime-2.1', 'text-embedding-3-large'].map((id) => ({ id }))
+			})
+		});
+	});
+
+	await page.route('**/api.openai.com/v1/responses', scriptedModel(scripts));
+
+	await page.route('**/api.openai.com/v1/realtime/client_secrets', async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({ value: 'ek_test', expires_at: Date.now() / 1000 + 60 })
+		});
+	});
+
+	await page.route('**/www.ecfr.gov/api/**', async (route) => {
+		const url = route.request().url();
+		if (url.includes('/structure')) {
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify(STRUCTURE)
+			});
+			return;
+		}
+		if (url.includes('/full/')) {
+			const identifier = /section=([^&]+)/.exec(url)?.[1] ?? SECTIONS[0].identifier;
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/xml',
+				body: sectionXml(decodeURIComponent(identifier))
+			});
+			return;
+		}
+		if (url.includes('/search/')) {
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					results: SECTIONS.map((section) => ({
+						hierarchy: { title: section.title, section: section.identifier },
+						hierarchy_headings: { title: 'Title 26', section: section.label },
+						headings: { section: section.label_description },
+						full_text_excerpt: section.body
+					}))
+				})
+			});
+			return;
+		}
+		await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+	});
+
+	await page.route('**/www.federalregister.gov/api/**', async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({ count: 0, results: [] })
 		});
 	});
 }

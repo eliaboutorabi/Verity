@@ -6,8 +6,9 @@ typing — and it searches the live Code of Federal Regulations, reads the secti
 it found, and cites what it read. Drop in an engagement letter or a client memo
 and it will tell you which passages a reviewer would stop at, and why.
 
-It is bring-your-own-key: you paste an OpenAI key, it stays in your browser, and
-nothing is stored on the server.
+It is bring-your-own-key, and there is no server: the site is static, and every
+request goes from your browser straight to the service that answers it, on your
+own key. Live at **https://eliaboutorabi.github.io/Verity/**.
 
 ```bash
 npm install
@@ -73,9 +74,9 @@ the real things are written — the engagement letter alone comes back with
 fifteen findings and citations into Circular 230 and the FBAR regulation. They
 are built by `scripts/build-samples.mjs`, so the wording is reviewable in a diff.
 
-**Teach her.** Settings carries *knowledge* — standing background about your
+**Teach her.** Settings carries _knowledge_ — standing background about your
 practice, folded into the prompt as background rather than instruction — and
-*skills*, which are named instructions plus the tool packs they need. Switching
+_skills_, which are named instructions plus the tool packs they need. Switching
 a skill off withholds those tools rather than politely asking her not to use
 them.
 
@@ -100,11 +101,11 @@ starting a competing one.
 
 Two free public APIs. Neither needs a key, an account, or a payment method.
 
-| Source | Answers | Used for | Key |
-| --- | --- | --- | --- |
-| [eCFR](https://www.ecfr.gov/developers) | What the rule **is** | Search and full section text across CFR titles 12, 17, 26, 29, 31 and 48 | none |
-| [Federal Register](https://www.federalregister.gov/developers/api/v1) | What is **changing** | Proposed and final rules, effective dates, comment deadlines | none |
-| [Mistral Document AI](https://docs.mistral.ai/) | **Where** a passage sits, on a scan | Reading a page with no text layer, so a finding can still be drawn on it | yours, optional |
+| Source                                                                | Answers                             | Used for                                                                 | Key             |
+| --------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------ | --------------- |
+| [eCFR](https://www.ecfr.gov/developers)                               | What the rule **is**                | Search and full section text across CFR titles 12, 17, 26, 29, 31 and 48 | none            |
+| [Federal Register](https://www.federalregister.gov/developers/api/v1) | What is **changing**                | Proposed and final rules, effective dates, comment deadlines             | none            |
+| [Mistral Document AI](https://docs.mistral.ai/)                       | **Where** a passage sits, on a scan | Reading a page with no text layer, so a finding can still be drawn on it | yours, optional |
 
 ### Search is not the eCFR's own search
 
@@ -113,7 +114,7 @@ which is close to useless for a conceptual question — "home office exclusive
 use" returns building-and-loan associations, because those sections happen to
 say "home", "loan" and "use" a great many times.
 
-A section's *heading* is the precise signal, and every title's structure is one
+A section's _heading_ is the precise signal, and every title's structure is one
 small JSON document covering tens of thousands of sections. So headings are
 indexed and matched first, with full text filling in behind. The difference,
 from the regression tests in `src/lib/sources/search-quality.spec.ts`:
@@ -279,15 +280,15 @@ src/lib/harness/
 
 The events a plugin can hook, following the upstream contract:
 
-| Event | Mode | For |
-| --- | --- | --- |
-| `tools/pre-execute` | bail | Allow, deny or ask before a call runs |
-| `ctx.tools.guard()` | — | A monotonic denial no later listener can undo |
-| `tools/execute` | waterfall | Wrap dispatch — deadlines, retries, metrics |
-| `tools/post-execute` | serial | Attach model-facing context to a result |
-| `tools/result` | emit | Observe the frozen outcome |
-| `agent/request-error` | bail | Return a retry action, or let the error stand |
-| `agent/turn-stopping` | parallel | Object, and the turn reopens for one more step |
+| Event                 | Mode      | For                                            |
+| --------------------- | --------- | ---------------------------------------------- |
+| `tools/pre-execute`   | bail      | Allow, deny or ask before a call runs          |
+| `ctx.tools.guard()`   | —         | A monotonic denial no later listener can undo  |
+| `tools/execute`       | waterfall | Wrap dispatch — deadlines, retries, metrics    |
+| `tools/post-execute`  | serial    | Attach model-facing context to a result        |
+| `tools/result`        | emit      | Observe the frozen outcome                     |
+| `agent/request-error` | bail      | Return a retry action, or let the error stand  |
+| `agent/turn-stopping` | parallel  | Object, and the turn reopens for one more step |
 
 A tool's `output.speak()` is the same idea one level down: the registry picks
 the rendering by modality, so one tool serves a reader and a listener without
@@ -347,10 +348,19 @@ Pages   browser ──► /api/ocr ─────► Mistral (blocks and boxes 
 The file itself never leaves the browser except as the body of that one OCR
 request, and the marks are matched to positions in the tab that holds it.
 
-The caller's key reaches the server only as a request header, is spent on that
-one request, and is never written to a log, a database or an error message.
-There is no server-side session for it to leak into — which is why the auth and
-database scaffolding came out of the project.
+The key never leaves the browser at all.
+
+It used to. The app had five routes — run the agent, execute a voice tool call,
+mint a realtime secret, list the key's models, forward a PDF to Mistral — and
+the key travelled through each of them, spent immediately and never written
+down, but travelling all the same. None of those routes needed to exist. Every
+upstream here (eCFR, the Federal Register, OpenAI, Mistral) answers a
+cross-origin request, and the agent loop is plain fetch-driven TypeScript with
+nothing Node-only in it. They were a proxy for the sake of being a proxy.
+
+So they are gone, and "it stays in your browser" is now a fact about the
+architecture rather than a promise about our conduct. There is no server to
+trust.
 
 ## Testing
 
@@ -359,9 +369,12 @@ npm run check   # types and a11y — 0 errors, 0 warnings
 npm test        # 44 unit tests, then 14 end-to-end
 ```
 
-The end-to-end suite drives the real UI in Chromium with the API routes
-stubbed, so it needs no key and does not call two free government APIs on every
-run. It covers the key gate (including a rejected key), a full turn rendering
+The end-to-end suite drives the real UI in Chromium with the four upstream
+hosts stubbed, so it needs no key and does not call two free government APIs on
+every run. The stubs sit at the network boundary rather than at an internal
+seam, so a test exercises the same code the reader does: the model's stream is
+parsed by the real adapter, the tool call goes through the real registry, and
+the card is drawn by the tool's own presenter. It covers the key gate (including a rejected key), a full turn rendering
 its regulation card and citation rail, loading and removing a document, the
 settings popover, the character switch, and a 375×812 phone layout.
 
@@ -377,10 +390,26 @@ a document review that follows its own findings into the regulation.
 
 ## Deployment
 
-Configured for Vercel via `@sveltejs/adapter-vercel`. `npm run build` produces
-the bundle. **Microphone access requires HTTPS** anywhere but localhost.
+GitHub Pages, from `.github/workflows/deploy.yml` on every push to `main`. The
+workflow typechecks, runs both test suites, builds, and uploads — no secrets,
+because there are none to hold.
 
-No environment variables are needed — the app has no server-side secrets.
+```bash
+BASE_PATH=/Verity npm run build     # what the workflow builds
+```
+
+Pages serves a project site from a subdirectory, so `BASE_PATH` is taken from
+the repository name rather than written down; renaming the repository does not
+quietly break every asset URL. The same end-to-end suite can be pointed at the
+built artefact, served from that subdirectory, which is how the base path is
+actually checked rather than assumed:
+
+```bash
+E2E_BASE_URL=http://localhost:4183/Verity/ npx playwright test
+```
+
+**Microphone access requires HTTPS** anywhere but localhost, which Pages
+provides.
 
 ## Limitations
 

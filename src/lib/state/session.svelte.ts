@@ -7,6 +7,7 @@
 
 import { browser } from '$app/environment';
 import { DEFAULT_MODEL } from '$lib/harness';
+import { describeError, listModels } from '$lib/client/openai';
 import { isCharacterId, type CharacterId } from '$lib/voices';
 
 const KEY_STORAGE = 'regassist.openai-key';
@@ -53,12 +54,6 @@ function storedTheme(): Theme | null {
 function systemTheme(): Theme {
 	if (!browser) return 'light';
 	return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-export interface ModelAvailability {
-	models: string[];
-	defaultModel: string;
-	realtimeAvailable: boolean;
 }
 
 class SessionState {
@@ -147,20 +142,19 @@ class SessionState {
 		this.verifying = true;
 		this.keyError = null;
 		try {
-			const response = await fetch('/api/models', { headers: { 'x-openai-key': candidate } });
-			if (!response.ok) {
-				const body = (await response.json().catch(() => null)) as { message?: string } | null;
-				this.keyError = body?.message ?? 'That key was rejected by OpenAI.';
-				return false;
-			}
-			const payload = (await response.json()) as ModelAvailability;
+			const payload = await listModels(candidate);
 			this.availableModels = payload.models;
 			this.realtimeAvailable = payload.realtimeAvailable;
 			if (!payload.models.includes(this.model)) this.setModel(payload.defaultModel);
 			this.setKey(candidate);
 			return true;
-		} catch {
-			this.keyError = 'Could not reach the server to check that key.';
+		} catch (cause) {
+			// The key itself is the only credential in play, so a rejection is
+			// about the key rather than about reaching anything.
+			const message = describeError(cause);
+			this.keyError = /401|unauthor|invalid.*key/i.test(message)
+				? 'That key was rejected by OpenAI.'
+				: `Could not check that key. ${message}`;
 			return false;
 		} finally {
 			this.verifying = false;

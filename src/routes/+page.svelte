@@ -9,6 +9,7 @@
 	 */
 	import { onMount, tick } from 'svelte';
 	import { MOUTH_AT_REST, type MouthPose } from '$lib/client/lipsync';
+	import { base } from '$app/paths';
 	import { extractText } from '$lib/client/extract';
 	import StarterCard from '$lib/components/StarterCard.svelte';
 	import BookOpenText from '@jis3r/icons/icons/book-open-text';
@@ -534,7 +535,7 @@
 	async function loadSample(sample: { name: string; file: string }) {
 		loadingSample = sample.file;
 		try {
-			const response = await fetch(`/samples/${sample.file}`);
+			const response = await fetch(`${base}/samples/${sample.file}`);
 			if (!response.ok) throw new Error('That sample could not be fetched.');
 			const file = new File([await response.blob()], sample.file, { type: 'application/pdf' });
 			documents.add(sample.file, await extractText(file), 'file', file);
